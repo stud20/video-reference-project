@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Project specific
+data/temp/*
+data/cache/*
+!data/temp/.gitkeep
+!data/cache/.gitkeep
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log
