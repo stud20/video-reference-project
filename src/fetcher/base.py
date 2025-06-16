@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple
 import os
 from src.models.video import Video, VideoMetadata
+from utils.logger import get_logger
 
 class VideoFetcher(ABC):
     """비디오 다운로더 추상 클래스"""
@@ -10,6 +11,7 @@ class VideoFetcher(ABC):
     def __init__(self):
         from config.settings import Settings
         self.settings = Settings()
+        self.logger = get_logger(__name__)
     
     @abstractmethod
     def is_supported(self, url: str) -> bool:
