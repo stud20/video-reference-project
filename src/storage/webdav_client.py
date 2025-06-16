@@ -23,6 +23,23 @@ class WebDAVStorage:
         }
         return Client(options)
     
+    def _ensure_remote_directory(self, remote_dir: str):
+        """원격 디렉토리가 존재하는지 확인하고 없으면 생성"""
+        # 경로를 '/'로 분리하고 순차적으로 생성
+        parts = remote_dir.strip('/').split('/')
+        current_path = ""
+        
+        for part in parts:
+            current_path = os.path.join(current_path, part)
+            try:
+                # 디렉토리 존재 여부 확인
+                if not self.client.check(current_path):
+                    self.logger.info(f"📁 디렉토리 생성: {current_path}")
+                    self.client.mkdir(current_path)
+            except Exception as e:
+                # 이미 존재하는 경우 무시
+                self.logger.debug(f"디렉토리 확인/생성 중 오류 (무시 가능): {e}")
+    
     def upload_file(self, local_path: str, remote_folder: str = None) -> str:
         """파일을 WebDAV 서버에 업로드"""
         if remote_folder is None:
@@ -34,10 +51,19 @@ class WebDAVStorage:
         remote_path = os.path.join(clean_folder, filename)
         
         try:
+            # 원격 디렉토리 생성
+            remote_dir = os.path.dirname(remote_path)
+            if remote_dir:
+                self._ensure_remote_directory(remote_dir)
+            
             self.logger.info(f"📤 업로드 시작: {local_path} -> {remote_path}")
+            
+            # 파일 업로드
             self.client.upload_sync(remote_path=remote_path, local_path=local_path)
+            
             self.logger.info(f"✅ 업로드 완료: {remote_path}")
             return remote_path
+            
         except Exception as e:
             self.logger.error(f"❌ 업로드 실패: {e}")
             raise
@@ -65,7 +91,22 @@ class WebDAVStorage:
         """원격 폴더의 파일 목록 조회"""
         folder = remote_folder or self.settings.webdav.remote_folder
         try:
+            # 폴더가 존재하는지 먼저 확인
+            if not self.client.check(folder):
+                self.logger.warning(f"폴더가 존재하지 않습니다: {folder}")
+                return []
             return self.client.list(folder)
         except Exception as e:
             self.logger.error(f"폴더 목록 조회 실패: {e}")
             return []
+    
+    def test_connection(self) -> bool:
+        """WebDAV 연결 테스트"""
+        try:
+            # 루트 디렉토리 목록 조회로 연결 테스트
+            self.client.list("/")
+            self.logger.info("✅ WebDAV 연결 성공")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ WebDAV 연결 실패: {e}")
+            return False
