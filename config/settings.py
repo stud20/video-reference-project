@@ -21,11 +21,12 @@ class VideoConfig:
     max_duration: int = 600  # 10분
     output_format: str = "mp4"
     quality: str = "bestvideo+bestaudio/best"
-    subtitle_languages: list = None
+    # subtitle_languages: list = None  # 자막 비활성화
     
     def __post_init__(self):
-        if self.subtitle_languages is None:
-            self.subtitle_languages = ['ko', 'en']
+        pass
+        # if self.subtitle_languages is None:
+        #     self.subtitle_languages = ['ko', 'en']
 
 @dataclass
 class PathConfig:
