@@ -20,12 +20,12 @@ def init_session_state():
     """세션 상태 초기화"""
     if 'video_service' not in st.session_state:
         # 환경변수에서 스토리지 타입 읽기
-        storage_type_str = os.getenv("STORAGE_TYPE", "sftp")
+        storage_type_str = os.getenv("STORAGE_TYPE", "sftp")  # 기본값 sftp
         try:
             storage_type = StorageType[storage_type_str.upper()]
         except KeyError:
-            storage_type = StorageType.LOCAL
-            logger.warning(f"알 수 없는 스토리지 타입: {storage_type_str}, 로컬 저장소 사용")
+            storage_type = StorageType.SFTP
+            logger.warning(f"알 수 없는 스토리지 타입: {storage_type_str}, SFTP 사용")
         
         # VideoService 초기화 (스토리지 타입 전달)
         st.session_state.video_service = VideoService(storage_type=storage_type)
@@ -61,10 +61,10 @@ def main():
         with storage_status.container():
             if st.session_state.storage_type == StorageType.LOCAL:
                 st.warning("📁 로컬 저장소 사용 중")
-            elif st.session_state.storage_type == StorageType.SYNOLOGY_API:
-                st.success("☁️ Synology NAS 연결")
             elif st.session_state.storage_type == StorageType.SFTP:
-                st.success("🔐 SFTP 연결")
+                st.success("🔐 SFTP 연결 (시놀로지 NAS)")
+            elif st.session_state.storage_type == StorageType.SYNOLOGY_API:
+                st.success("☁️ Synology API 연결")
             elif st.session_state.storage_type == StorageType.WEBDAV:
                 st.info("🌐 WebDAV 연결")
         
@@ -151,13 +151,18 @@ def main():
                         # VideoService를 통해 처리
                         video = st.session_state.video_service.process_video(video_url)
                         
-                        # 3단계: 메타데이터 분석
-                        status_text.text("📊 메타데이터 분석 중...")
-                        progress_bar.progress(60)
+                        # 3단계: 씬 추출
+                        status_text.text("🎬 주요 씬 추출 중...")
+                        progress_bar.progress(50)
                         
-                        # 4단계: 스토리지 업로드
+                        # 4단계: AI 분석 (옵션)
+                        if os.getenv("OPENAI_API_KEY"):
+                            status_text.text("🤖 AI 영상 분석 중...")
+                            progress_bar.progress(70)
+                        
+                        # 5단계: 스토리지 업로드
                         status_text.text("💾 스토리지에 저장 중...")
-                        progress_bar.progress(80)
+                        progress_bar.progress(90)
                         
                         # 5단계: 완료
                         progress_bar.progress(100)
@@ -197,12 +202,79 @@ def main():
                             if metadata_dict.get('description'):
                                 st.text_area("설명", metadata_dict['description'], height=100, disabled=True)
                     
+                    # 씬 이미지 표시
+                    if video.scenes:
+                        with st.expander("🎬 추출된 씬 이미지", expanded=True):
+                            st.write(f"총 {len(video.scenes)}개의 주요 씬이 추출되었습니다.")
+                            
+                            # 이미지 그리드로 표시
+                            cols = st.columns(3)  # 3열로 표시
+                            for i, scene in enumerate(video.scenes):
+                                with cols[i % 3]:
+                                    if os.path.exists(scene.frame_path):
+                                        st.image(scene.frame_path, 
+                                               caption=f"씬 {i+1} ({scene.timestamp:.1f}초)",
+                                               use_container_width=True)
+                                    else:
+                                        st.warning(f"씬 {i+1} 이미지를 찾을 수 없습니다")
+                    
+                    # AI 분석 결과 표시 (있는 경우)
+                    if video.analysis_result:
+                        with st.expander("🤖 AI 분석 결과", expanded=True):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.metric("장르", video.analysis_result.get('genre', 'N/A'))
+                                st.metric("표현 형식", video.analysis_result.get('format_type', 'N/A'))
+                                if video.analysis_result.get('mood'):
+                                    st.metric("분위기", video.analysis_result['mood'])
+                            
+                            with col2:
+                                if video.analysis_result.get('target_audience'):
+                                    st.metric("타겟 고객층", video.analysis_result['target_audience'])
+                                
+                                # 태그 표시
+                                tags = video.analysis_result.get('tags', [])
+                                if tags:
+                                    st.write("**태그:**")
+                                    # 태그를 여러 줄로 표시
+                                    tags_per_line = 5
+                                    for i in range(0, len(tags), tags_per_line):
+                                        tag_group = tags[i:i+tags_per_line]
+                                        tag_html = " ".join([f'<span style="background-color: #e1e4e8; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 14px; display: inline-block;">#{tag}</span>' for tag in tag_group])
+                                        st.markdown(tag_html, unsafe_allow_html=True)
+                            
+                            # 판단 이유 - 전체 너비로 표시
+                            if video.analysis_result.get('reason'):
+                                st.write("**📝 판단 이유:**")
+                                # 텍스트 영역으로 표시하여 스크롤 가능하게 함
+                                st.text_area(
+                                    label="판단 이유",
+                                    value=video.analysis_result['reason'],
+                                    height=150,
+                                    disabled=True,
+                                    label_visibility="collapsed"
+                                )
+                            
+                            # 특징 및 특이사항 - 전체 너비로 표시
+                            if video.analysis_result.get('features'):
+                                st.write("**🎯 특징 및 특이사항:**")
+                                st.text_area(
+                                    label="특징",
+                                    value=video.analysis_result['features'],
+                                    height=200,
+                                    disabled=True,
+                                    label_visibility="collapsed"
+                                )
+                    
                     # 세션 정보
                     with st.expander("🔧 기술 정보"):
-                        st.info(f"📁 세션 ID: {video.session_id}")
+                        st.info(f"📁 세션 ID (Video ID): {video.session_id}")
                         st.info(f"💾 저장 위치: {st.session_state.storage_type.value}")
                         if video.local_path:
-                            st.text(f"📄 로컬 경로: {video.local_path}")
+                            st.text(f"📄 비디오 경로: {video.local_path}")
+                        if video.scenes:
+                            st.text(f"🎬 추출된 씬 수: {len(video.scenes)}개")
                     
                 except ValueError as e:
                     st.error(f"❌ 오류: {str(e)}")
@@ -220,19 +292,13 @@ def main():
         
         # 지원 플랫폼
         st.subheader("🌐 지원 플랫폼")
-        platform_col1, platform_col2 = st.columns(2)
-        with platform_col1:
-            st.metric("YouTube", "✅ 지원", delta="활성")
-        with platform_col2:
-            st.metric("Vimeo", "✅ 지원", delta="활성")
+        st.metric("YouTube", "✅ 지원")
+        st.metric("Vimeo", "✅ 지원")
         
-        # 시스템 리소스 (더미 데이터, 실제로는 시스템 모니터링 추가 가능)
+        # 시스템 리소스 (더미 데이터)
         st.subheader("💻 시스템 리소스")
-        resource_col1, resource_col2 = st.columns(2)
-        with resource_col1:
-            st.metric("CPU 사용률", "15%", delta="-2%")
-        with resource_col2:
-            st.metric("메모리", "2.1 GB", delta="0.1 GB")
+        st.metric("CPU 사용률", "15%")
+        st.metric("메모리", "2.1 GB")
         
         # 작업 통계
         st.subheader("📈 작업 통계")
@@ -250,7 +316,10 @@ def main():
                     for item in os.listdir(temp_dir):
                         item_path = os.path.join(temp_dir, item)
                         if os.path.isdir(item_path):
-                            shutil.rmtree(item_path)
+                            try:
+                                shutil.rmtree(item_path)
+                            except Exception as e:
+                                logger.error(f"폴더 삭제 실패: {e}")
                 st.success("✅ 임시 파일 정리 완료!")
 
 if __name__ == "__main__":

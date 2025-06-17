@@ -61,10 +61,10 @@ class DownloadOptions:
             'prefer_ffmpeg': True,
             'keepvideo': False,
             
-            # 자막
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': subtitle_langs or ['ko', 'en'],
+            # 자막 - 비활성화 (오류 방지)
+            'writesubtitles': False,
+            'writeautomaticsub': False,
+            # 'subtitleslangs': subtitle_langs or ['ko', 'en'],
             'embedsubtitles': False,  # 별도 파일로 저장
             
             # 썸네일
@@ -119,9 +119,9 @@ class DownloadOptions:
             'prefer_ffmpeg': True,
             'keepvideo': False,
             
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': subtitle_langs or ['ko', 'en'],
+            'writesubtitles': False,  # 자막 비활성화
+            'writeautomaticsub': False,
+            # 'subtitleslangs': subtitle_langs or ['ko', 'en'],
             
             'retries': 3,
             'fragment_retries': 5,
@@ -148,7 +148,7 @@ class DownloadOptions:
             'merge_output_format': 'mp4',
             'keepvideo': False,
             
-            'writesubtitles': False,  # 속도를 위해 제외
+            'writesubtitles': False,  # 자막 비활성화
             'writethumbnail': False,
             
             'retries': 3,

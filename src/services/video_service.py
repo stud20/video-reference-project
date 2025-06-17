@@ -1,4 +1,5 @@
 # src/services/video_service.py
+import os
 from typing import Optional, List
 from src.models.video import Video
 from src.fetcher.youtube import YouTubeFetcher
@@ -42,8 +43,42 @@ class VideoService:
             # 4. 메타데이터 저장
             metadata_path = fetcher.save_metadata(video)
             
-            # 5. 스토리지에 저장
-            self._save_to_storage(video, [video_path, metadata_path])
+            # 5. 씬 추출
+            self.logger.info("🎬 씬 추출 시작...")
+            from src.extractor.scene_extractor import SceneExtractor
+            
+            scene_extractor = SceneExtractor()
+            scenes_dir = os.path.join(video.session_dir, "scenes")
+            video.scenes = scene_extractor.extract_scenes(video_path, scenes_dir)
+            
+            # 6. AI 분석 (OpenAI API 키가 있는 경우)
+            if os.getenv("OPENAI_API_KEY"):
+                self.logger.info("🤖 AI 분석 시작...")
+                from src.analyzer.ai_analyzer import AIAnalyzer
+                
+                analyzer = AIAnalyzer()
+                analysis_result = analyzer.analyze_video(video)
+                
+                if analysis_result:
+                    self.logger.info(f"✅ AI 분석 완료: {analysis_result.genre}")
+                else:
+                    self.logger.warning("⚠️ AI 분석 실패 또는 스킵")
+            
+            # 7. 스토리지에 저장 (비디오, 메타데이터, 씬 이미지, 분석 결과 모두)
+            files_to_upload = [video_path, metadata_path]
+            
+            # 씬 이미지 파일들 추가
+            if video.scenes:
+                for scene in video.scenes:
+                    if os.path.exists(scene.frame_path):
+                        files_to_upload.append(scene.frame_path)
+                
+                # scenes.json 파일도 추가
+                scenes_json = os.path.join(scenes_dir, "scenes.json")
+                if os.path.exists(scenes_json):
+                    files_to_upload.append(scenes_json)
+            
+            self._save_to_storage(video, files_to_upload)
             
             return video
             

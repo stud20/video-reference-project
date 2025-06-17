@@ -31,7 +31,7 @@ class Scene:
 @dataclass
 class Video:
     """비디오 전체 정보"""
-    session_id: str
+    session_id: str  # 이제 video_id로 사용
     url: str
     local_path: Optional[str] = None
     metadata: Optional[VideoMetadata] = None
@@ -40,12 +40,13 @@ class Video:
     created_at: datetime = field(default_factory=datetime.now)
     
     def __post_init__(self):
+        # session_id는 이제 video_id로 설정됨
         if not self.session_id:
             self.session_id = str(uuid.uuid4())[:8]
     
     @property
     def session_dir(self) -> str:
-        """세션 디렉토리 경로"""
+        """세션 디렉토리 경로 (video_id 기반)"""
         from config.settings import Settings
         import os
         return os.path.join(Settings.paths.temp_dir, self.session_id)
