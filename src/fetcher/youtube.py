@@ -2,120 +2,224 @@
 import yt_dlp
 import os
 import re
-from typing import Tuple
-from src.fetcher.base import VideoFetcher
-from src.models.video import Video, VideoMetadata
-from src.fetcher.download_options import DownloadOptions
-from src.fetcher.video_processor import VideoProcessor
+from typing import Dict, Any, Optional
 from utils.logger import get_logger
 
-class YouTubeFetcher(VideoFetcher):
-    """YouTube 비디오 다운로더"""
+logger = get_logger(__name__)
+
+
+class YouTubeDownloader:
+    """YouTube/Vimeo 비디오 다운로더 (단순화된 버전)"""
     
     def __init__(self):
-        super().__init__()
-        self.logger = get_logger(__name__)
+        self.logger = logger
+        self.temp_dir = "data/temp"
+        os.makedirs(self.temp_dir, exist_ok=True)
     
     def is_supported(self, url: str) -> bool:
-        """YouTube URL인지 확인"""
-        youtube_patterns = [
+        """지원하는 URL인지 확인"""
+        patterns = [
+            # YouTube
             r'(https?://)?(www\.)?(youtube\.com|youtu\.be)/',
             r'(https?://)?(www\.)?youtube\.com/watch\?v=',
-            r'(https?://)?(www\.)?youtu\.be/'
+            r'(https?://)?(www\.)?youtu\.be/',
+            # Vimeo
+            r'(https?://)?(www\.)?vimeo\.com/\d+',
+            r'(https?://)?player\.vimeo\.com/video/\d+'
         ]
-        return any(re.match(pattern, url) for pattern in youtube_patterns)
+        return any(re.match(pattern, url) for pattern in patterns)
     
     def _sanitize_filename(self, title: str, max_length: int = 100) -> str:
         """파일명으로 사용할 수 있도록 제목 정리"""
         # 특수문자를 언더스코어로 치환
         safe_title = re.sub(r'[<>:"/\\|?*]', '_', title)
+        # 연속된 언더스코어를 하나로
+        safe_title = re.sub(r'_+', '_', safe_title)
+        # 앞뒤 공백 및 언더스코어 제거
+        safe_title = safe_title.strip('_ ')
         # 최대 길이 제한
         return safe_title[:max_length]
     
-    def download(self, video: Video) -> Tuple[str, VideoMetadata]:
-        """YouTube 비디오 다운로드"""
-        # 먼저 video_id와 제목 추출
-        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-            info = ydl.extract_info(video.url, download=False)
-            video_id = info.get('id', '')
-            video_title = info.get('title', 'untitled')
+    def download(self, url: str) -> Dict[str, Any]:
+        """
+        비디오 다운로드
         
-        # video_id를 session_id로 설정
-        video.session_id = video_id
-        
-        # 세션 디렉토리 준비 (video_id 기반)
-        output_dir = self.prepare_session_directory(video)
-        
-        # 파일명은 제목으로 (특수문자 제거)
-        safe_title = self._sanitize_filename(video_title)
-        output_path = os.path.join(output_dir, f'{safe_title}.%(ext)s')
-        
-        # 설정에서 품질 옵션 가져오기 (기본값: best)
-        quality_option = os.getenv("VIDEO_QUALITY", "best")
-        
-        # 품질에 따른 다운로드 옵션 선택
-        if quality_option == "balanced":
-            ydl_opts = DownloadOptions.get_balanced_mp4_options(
-                output_path, 
-                None  # 자막 언어 None으로 설정
-            )
-        elif quality_option == "fast":
-            ydl_opts = DownloadOptions.get_fast_mp4_options(output_path)
-        else:  # best
-            ydl_opts = DownloadOptions.get_best_mp4_options(
-                output_path,
-                None  # 자막 언어 None으로 설정
-            )
-        
-        # 디버그 모드 설정 반영
-        ydl_opts['quiet'] = not self.settings.DEBUG
-        ydl_opts['no_warnings'] = not self.settings.DEBUG
-        
-        # 다운로드 실행
-        self.logger.info(f"📥 다운로드 시작: {video.url} (품질: {quality_option})")
-        self.logger.info(f"📁 저장 위치: {output_dir}")
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video.url, download=True)
+        Args:
+            url: 다운로드할 비디오 URL
             
-            # 실제 다운로드된 파일 경로 찾기
-            downloaded_file = ydl.prepare_filename(info)
+        Returns:
+            다운로드 결과 딕셔너리
+            {
+                'filepath': str,  # 다운로드된 파일 경로
+                'video_id': str,  # 비디오 ID
+                'title': str,     # 비디오 제목
+                'duration': int,  # 영상 길이(초)
+                'uploader': str,  # 업로더
+                'upload_date': str,  # 업로드 날짜
+                'description': str,  # 설명
+                'view_count': int,   # 조회수
+                'like_count': int,   # 좋아요 수
+                'ext': str          # 파일 확장자
+            }
+        """
+        try:
+            # 1. 먼저 정보만 추출
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                video_id = info.get('id', '')
+                video_title = info.get('title', 'untitled')
             
-            # 확장자가 변경되었을 수 있으므로 확인
+            if not video_id:
+                raise ValueError("비디오 ID를 추출할 수 없습니다.")
+            
+            # 2. 다운로드 디렉토리 생성
+            output_dir = os.path.join(self.temp_dir, video_id)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 3. 파일명 생성
+            safe_title = self._sanitize_filename(video_title)
+            output_template = os.path.join(output_dir, f'{safe_title}.%(ext)s')
+            
+            # 4. 다운로드 옵션 설정
+            quality_option = os.getenv("VIDEO_QUALITY", "best")
+            ydl_opts = self._get_download_options(output_template, quality_option)
+            
+            self.logger.info(f"📥 다운로드 시작: {url} (품질: {quality_option})")
+            self.logger.info(f"📁 저장 위치: {output_dir}")
+            
+            # 5. 다운로드 실행
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                
+                # 실제 다운로드된 파일 경로 찾기
+                downloaded_file = ydl.prepare_filename(info)
+                
+                # 확장자가 변경되었을 수 있으므로 확인
+                if not os.path.exists(downloaded_file):
+                    base_name = os.path.splitext(downloaded_file)[0]
+                    for ext in ['.mp4', '.webm', '.mkv', '.mov']:
+                        test_file = base_name + ext
+                        if os.path.exists(test_file):
+                            downloaded_file = test_file
+                            break
+            
             if not os.path.exists(downloaded_file):
-                # mp4로 변환되었을 가능성
-                base_name = os.path.splitext(downloaded_file)[0]
-                for ext in ['.mp4', '.webm', '.mkv']:
-                    test_file = base_name + ext
-                    if os.path.exists(test_file):
-                        downloaded_file = test_file
-                        break
+                raise FileNotFoundError(f"다운로드된 파일을 찾을 수 없습니다: {downloaded_file}")
+            
+            # 6. 파일 크기 확인
+            file_size = os.path.getsize(downloaded_file) / (1024 * 1024)  # MB
+            self.logger.info(f"📊 파일 크기: {file_size:.1f} MB")
+            
+            # 7. 결과 반환
+            result = {
+                'filepath': downloaded_file,
+                'video_id': video_id,
+                'title': info.get('title', ''),
+                'duration': info.get('duration', 0),
+                'uploader': info.get('uploader', ''),
+                'upload_date': info.get('upload_date', ''),
+                'description': info.get('description', ''),
+                'view_count': info.get('view_count', 0),
+                'like_count': info.get('like_count', 0),
+                'ext': os.path.splitext(downloaded_file)[1][1:],  # 확장자 (점 제외)
+                'thumbnail': info.get('thumbnail', ''),
+                'webpage_url': info.get('webpage_url', url)
+            }
+            
+            self.logger.info(f"✅ 다운로드 완료: {safe_title}")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"다운로드 실패: {str(e)}")
+            raise
+    
+    def _get_download_options(self, output_template: str, quality: str = "best") -> Dict[str, Any]:
+        """
+        다운로드 옵션 생성
         
-        # 비디오 후처리 (코덱 확인 및 재인코딩)
-        processor = VideoProcessor()
-        final_video_path = processor.process_video(downloaded_file)
+        Args:
+            output_template: 출력 파일 템플릿
+            quality: 품질 옵션 (best, balanced, fast)
+            
+        Returns:
+            yt-dlp 옵션 딕셔너리
+        """
+        base_opts = {
+            'outtmpl': output_template,
+            'quiet': not os.getenv('DEBUG', 'false').lower() == 'true',
+            'no_warnings': not os.getenv('DEBUG', 'false').lower() == 'true',
+            'extract_flat': False,
+            'force_generic_extractor': False,
+        }
         
-        # 메타데이터 생성
-        metadata = VideoMetadata(
-            title=info.get("title"),
-            description=info.get("description"),
-            uploader=info.get("uploader"),
-            upload_date=info.get("upload_date"),
-            duration=info.get("duration"),
-            ext=os.path.splitext(final_video_path)[1][1:],  # 최종 확장자
-            video_id=info.get("id"),
-            webpage_url=info.get("webpage_url")
-        )
+        if quality == "fast":
+            # 빠른 다운로드 - 720p 이하 MP4만
+            opts = {
+                **base_opts,
+                'format': 'best[height<=720][ext=mp4]/best[height<=720]/best',
+                'merge_output_format': 'mp4',
+            }
+        elif quality == "balanced":
+            # 균형잡힌 품질 - 1080p 이하
+            opts = {
+                **base_opts,
+                'format': 'best[height<=1080]/best',
+                'merge_output_format': 'mp4',
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }]
+            }
+        else:  # best
+            # 최고 품질
+            opts = {
+                **base_opts,
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'merge_output_format': 'mp4',
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }]
+            }
         
-        # 파일 크기 확인
-        if os.path.exists(final_video_path):
-            file_size = os.path.getsize(final_video_path) / (1024 * 1024)  # MB
-            self.logger.info(f"📊 최종 파일 크기: {file_size:.1f} MB")
+        # 추가 옵션
+        opts.update({
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'no_color': True,
+            'noprogress': base_opts['quiet'],
+        })
         
-        # Video 객체 업데이트
-        video.local_path = final_video_path
-        video.metadata = metadata
+        return opts
+    
+    def get_video_info(self, url: str) -> Dict[str, Any]:
+        """
+        다운로드 없이 비디오 정보만 추출
         
-        self.logger.info(f"✅ 다운로드 완료: {final_video_path}")
-        
-        return final_video_path, metadata
+        Args:
+            url: 비디오 URL
+            
+        Returns:
+            비디오 정보 딕셔너리
+        """
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                return {
+                    'video_id': info.get('id', ''),
+                    'title': info.get('title', ''),
+                    'duration': info.get('duration', 0),
+                    'uploader': info.get('uploader', ''),
+                    'upload_date': info.get('upload_date', ''),
+                    'description': info.get('description', ''),
+                    'view_count': info.get('view_count', 0),
+                    'like_count': info.get('like_count', 0),
+                    'thumbnail': info.get('thumbnail', ''),
+                    'webpage_url': info.get('webpage_url', url)
+                }
+                
+        except Exception as e:
+            self.logger.error(f"정보 추출 실패: {str(e)}")
+            raise
