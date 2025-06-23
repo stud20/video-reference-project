@@ -203,6 +203,8 @@ class VideoService:
             
             # 5. DB에 영상 정보 저장
             update_progress("database", 45, "💾 데이터베이스에 정보 저장 중...")
+
+            # 확장된 메타데이터를 모두 포함하여 저장
             video_data = {
                 'video_id': video_id,
                 'url': url,
@@ -210,17 +212,24 @@ class VideoService:
                 'duration': video.metadata.duration,
                 'platform': platform,
                 'download_date': datetime.now().isoformat(),
+                
+                # 확장된 메타데이터 추가
                 'uploader': video.metadata.uploader,
+                'channel': video.metadata.uploader,  # 호환성을 위해 중복 저장
                 'description': video.metadata.description,
                 'view_count': video.metadata.view_count,
+                'like_count': video.metadata.like_count,
+                'comment_count': video.metadata.comment_count,
                 'tags': video.metadata.tags,
                 'channel_id': video.metadata.channel_id,
                 'categories': video.metadata.categories,
                 'language': video.metadata.language,
-                'like_count': video.metadata.like_count,
-                'comment_count': video.metadata.comment_count,
-                'upload_date': video.metadata.upload_date
+                'upload_date': video.metadata.upload_date,
+                'age_limit': video.metadata.age_limit,
+                'thumbnail': video.metadata.thumbnail,
+                'webpage_url': video.metadata.webpage_url,
             }
+
             self.db.save_video_info(video_data)
             
             # 6. 씬 추출
@@ -386,6 +395,59 @@ class VideoService:
             
             update_progress("complete", 100, f"✅ 영상 처리 완료: {video_id}")
             return video
+
+            if os.getenv("UPLOAD_TO_NOTION", "false").lower() == "true":
+                update_progress("notion", 82, "📝 Notion 데이터베이스에 업로드 중...")
+                
+                try:
+                    # Notion 서비스가 초기화되어 있는지 확인
+                    if not hasattr(self, 'notion_service') or self.notion_service is None:
+                        from src.services.notion_service import NotionService
+                        self.notion_service = NotionService()
+                    
+                    # 데이터 검증
+                    logger.info(f"🔍 Notion 업로드 데이터 검증")
+                    logger.info(f"  - video_data 존재: {video_data is not None}")
+                    logger.info(f"  - analysis_data 존재: {analysis_data is not None}")
+                    
+                    if video_data and analysis_data:
+                        # 필수 필드 확인
+                        logger.info(f"  - video_id: {video_data.get('video_id')}")
+                        logger.info(f"  - title: {video_data.get('title')}")
+                        logger.info(f"  - genre: {analysis_data.get('genre')}")
+                        
+                        # Notion에 추가
+                        success, result = self.notion_service.add_video_to_database(
+                            video_data, 
+                            analysis_data
+                        )
+                        
+                        if success:
+                            update_progress("notion", 85, f"✅ Notion 업로드 성공: {result}")
+                            logger.info(f"✅ Notion 업로드 성공 - Page ID: {result}")
+                        else:
+                            update_progress("notion", 85, f"⚠️ Notion 업로드 실패: {result}")
+                            logger.warning(f"Notion 업로드 실패: {result}")
+                    else:
+                        error_msg = "데이터가 불완전합니다"
+                        if not video_data:
+                            error_msg += " (video_data 없음)"
+                        if not analysis_data:
+                            error_msg += " (analysis_data 없음)"
+                        
+                        update_progress("notion", 85, f"⚠️ Notion 업로드 실패: {error_msg}")
+                        logger.error(f"Notion 업로드 실패: {error_msg}")
+                        
+                except ImportError as e:
+                    update_progress("notion", 85, "⚠️ Notion 서비스를 사용할 수 없습니다")
+                    logger.error(f"Notion 서비스 임포트 실패: {e}")
+                except Exception as e:
+                    update_progress("notion", 85, f"⚠️ Notion 업로드 중 오류: {str(e)}")
+                    logger.error(f"Notion 업로드 중 예외 발생: {e}")
+                    import traceback
+                    logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
+            else:
+                update_progress("notion", 85, "ℹ️ Notion 업로드 비활성화")
             
         except Exception as e:
             if progress_callback:
