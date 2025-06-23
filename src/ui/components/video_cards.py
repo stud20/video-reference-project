@@ -251,14 +251,17 @@ def render_action_buttons(video_id: str, has_analysis: bool):
                     db.close()
                     
                     if video_data and analysis_data:
-                        # 업로드
-                        success, result = notion.add_video_analysis_to_page(
+                        # 데이터베이스에 업로드 (기존 add_video_analysis_to_page 대신)
+                        success, result = notion.add_video_to_database(
                             video_data,
                             analysis_data
                         )
                         
                         if success:
-                            st.success(f"✅ Notion 업로드 성공!")
+                            st.success(f"✅ Notion DB 업로드 성공!")
+                            # 데이터베이스 URL 표시
+                            db_url = notion.get_database_url()
+                            st.info(f"📊 [데이터베이스 보기]({db_url})")
                         else:
                             st.error(f"업로드 실패: {result}")
                     else:
@@ -266,6 +269,9 @@ def render_action_buttons(video_id: str, has_analysis: bool):
                         
                 except ImportError:
                     st.error("Notion 서비스를 사용할 수 없습니다.")
+                except ValueError as e:
+                    st.error(f"Notion 설정 오류: {str(e)}")
+                    st.info("필요한 환경변수: NOTION_API_KEY, NOTION_DATABASE_ID")
                 except Exception as e:
                     st.error(f"Notion 업로드 오류: {str(e)}")
 

@@ -52,7 +52,21 @@ class VideoService:
         self.storage_manager = StorageManager(storage_type)
         self.db = VideoAnalysisDB()  # TinyDB 매니저 추가
         
-        logger.info(f"VideoService 초기화 완료 - Storage: {storage_type.value}, AI: {'활성화' if self.ai_analyzer else '비활성화'}")
+        # Notion 서비스 초기화 (옵션)
+        self.notion_service = None
+        self.auto_upload_to_notion = os.getenv("AUTO_UPLOAD_TO_NOTION", "true").lower() == "true"
+        
+        if self.auto_upload_to_notion:
+            try:
+                from src.services.notion_service import NotionService
+                self.notion_service = NotionService()
+                logger.info("✅ Notion 서비스 초기화 성공 (자동 업로드 활성화)")
+            except Exception as e:
+                logger.warning(f"⚠️ Notion 서비스 초기화 실패: {str(e)}")
+                logger.warning("⚠️ 자동 Notion 업로드가 비활성화됩니다.")
+                self.notion_service = None
+        
+        logger.info(f"VideoService 초기화 완료 - Storage: {storage_type.value}, AI: {'활성화' if self.ai_analyzer else '비활성화'}, Notion: {'활성화' if self.notion_service else '비활성화'}")
     
     def _parse_video_url(self, url: str) -> Tuple[str, str]:
         """
@@ -147,6 +161,15 @@ class VideoService:
             
             # 4. Video 객체 생성
             update_progress("metadata", 40, "📋 메타데이터 처리 중...")
+            
+            # 디버깅: 다운로드 결과 확인
+            logger.debug(f"다운로드 결과 키: {list(download_result.keys())}")
+            logger.debug(f"업로더: {download_result.get('uploader', 'MISSING')}")
+            logger.debug(f"업로드 날짜: {download_result.get('upload_date', 'MISSING')}")
+            logger.debug(f"태그: {download_result.get('tags', [])[:5]}")
+            logger.debug(f"언어: {download_result.get('language', 'MISSING')}")
+            logger.debug(f"댓글수: {download_result.get('comment_count', 'MISSING')}")
+            
             video = Video(
                 session_id=video_id,
                 url=url,
@@ -170,7 +193,8 @@ class VideoService:
                     channel_id=download_result.get('channel_id', ''),
                     comment_count=download_result.get('comment_count', 0),
                     age_limit=download_result.get('age_limit', 0),
-                    subtitle_files=download_result.get('subtitle_files', {})
+                    subtitle_files=download_result.get('subtitle_files', {}),
+                    platform=platform  # 플랫폼 추가
                 )
             )
             
@@ -194,7 +218,8 @@ class VideoService:
                 'categories': video.metadata.categories,
                 'language': video.metadata.language,
                 'like_count': video.metadata.like_count,
-                'comment_count': video.metadata.comment_count
+                'comment_count': video.metadata.comment_count,
+                'upload_date': video.metadata.upload_date
             }
             self.db.save_video_info(video_data)
             
@@ -328,9 +353,35 @@ class VideoService:
             else:
                 update_progress("upload", 95, "ℹ️ 로컬 스토리지 사용 중")
             
-            # 9. 임시 파일 정리
+            # 9. Notion 자동 업로드 (AI 분석이 완료된 경우만)
+            if self.notion_service and self.auto_upload_to_notion and video.analysis_result:
+                try:
+                    update_progress("notion", 96, "📝 Notion 데이터베이스에 업로드 중...")
+                    
+                    # 최신 데이터 가져오기
+                    latest_video_data = self.db.get_video_info(video_id)
+                    latest_analysis_data = self.db.get_latest_analysis(video_id)
+                    
+                    if latest_video_data and latest_analysis_data:
+                        success, result = self.notion_service.add_video_to_database(
+                            latest_video_data,
+                            latest_analysis_data
+                        )
+                        
+                        if success:
+                            update_progress("notion", 98, "✅ Notion 업로드 성공!")
+                            logger.info(f"Notion 데이터베이스 URL: {self.notion_service.get_database_url()}")
+                        else:
+                            logger.warning(f"Notion 업로드 실패: {result}")
+                            update_progress("notion", 98, f"⚠️ Notion 업로드 실패: {result}")
+                    
+                except Exception as e:
+                    logger.error(f"Notion 업로드 중 오류: {str(e)}")
+                    update_progress("notion", 98, f"⚠️ Notion 업로드 오류: {str(e)}")
+            
+            # 10. 임시 파일 정리
             if os.getenv("CLEANUP_TEMP_FILES", "false").lower() == "true":
-                update_progress("cleanup", 98, "🗑️ 임시 파일 정리 중...")
+                update_progress("cleanup", 99, "🗑️ 임시 파일 정리 중...")
                 self._cleanup_temp_files(video)
             
             update_progress("complete", 100, f"✅ 영상 처리 완료: {video_id}")
