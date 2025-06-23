@@ -409,9 +409,9 @@ def show_bulk_notion_upload():
                 status_text.text(message)
             
             # 일괄 업로드 (페이지에 추가)
-            success_count, fail_count, errors = notion.bulk_add_to_page(
-                videos_to_upload,
-                progress_callback=update_progress
+            success_count, fail_count, errors = notion.bulk_add_to_database(
+            videos_to_upload,
+            progress_callback=update_progress
             )
             
             st.session_state.selected_videos = []
