@@ -165,10 +165,8 @@ class VideoService:
             # 디버깅: 다운로드 결과 확인
             logger.debug(f"다운로드 결과 키: {list(download_result.keys())}")
             logger.debug(f"업로더: {download_result.get('uploader', 'MISSING')}")
-            logger.debug(f"업로드 날짜: {download_result.get('upload_date', 'MISSING')}")
-            logger.debug(f"태그: {download_result.get('tags', [])[:5]}")
-            logger.debug(f"언어: {download_result.get('language', 'MISSING')}")
-            logger.debug(f"댓글수: {download_result.get('comment_count', 'MISSING')}")
+            logger.debug(f"썸네일: {download_result.get('thumbnail', 'MISSING')}")
+            logger.debug(f"webpage_url: {download_result.get('webpage_url', 'MISSING')}")
             
             video = Video(
                 session_id=video_id,
@@ -300,7 +298,8 @@ class VideoService:
                             'tags': getattr(analysis_result, 'tags', []),
                             'expression_style': getattr(analysis_result, 'format_type', ''),
                             'mood_tone': getattr(analysis_result, 'mood', ''),
-                            'target_audience': getattr(analysis_result, 'target_audience', '')
+                            'target_audience': getattr(analysis_result, 'target_audience', ''),
+                            'model_used': os.getenv('OPENAI_MODEL', 'gpt-4o')
                         }
                         
                         # DB에 저장
@@ -367,25 +366,53 @@ class VideoService:
                 try:
                     update_progress("notion", 96, "📝 Notion 데이터베이스에 업로드 중...")
                     
-                    # 최신 데이터 가져오기
-                    latest_video_data = self.db.get_video_info(video_id)
-                    latest_analysis_data = self.db.get_latest_analysis(video_id)
+                    # Video 객체에서 직접 데이터 생성 (DB를 거치지 않음!)
+                    video_data_for_notion = {
+                        'video_id': video.metadata.video_id,
+                        'title': video.metadata.title,
+                        'url': video.metadata.url,
+                        'webpage_url': video.metadata.webpage_url,
+                        'thumbnail': video.metadata.thumbnail,  # 이것이 핵심!
+                        'platform': video.metadata.platform,
+                        'duration': video.metadata.duration,
+                        'uploader': video.metadata.uploader,
+                        'channel': video.metadata.uploader,
+                        'channel_id': video.metadata.channel_id,
+                        'upload_date': video.metadata.upload_date,
+                        'description': video.metadata.description,
+                        'view_count': video.metadata.view_count,
+                        'like_count': video.metadata.like_count,
+                        'comment_count': video.metadata.comment_count,
+                        'tags': video.metadata.tags,
+                        'categories': video.metadata.categories,
+                        'language': video.metadata.language,
+                        'age_limit': video.metadata.age_limit,
+                    }
                     
-                    if latest_video_data and latest_analysis_data:
-                        success, result = self.notion_service.add_video_to_database(
-                            latest_video_data,
-                            latest_analysis_data
-                        )
-                        
-                        if success:
-                            update_progress("notion", 98, "✅ Notion 업로드 성공!")
-                            logger.info(f"Notion 데이터베이스 URL: {self.notion_service.get_database_url()}")
-                        else:
-                            logger.warning(f"Notion 업로드 실패: {result}")
-                            update_progress("notion", 98, f"⚠️ Notion 업로드 실패: {result}")
+                    # 디버깅
+                    logger.info(f"🔍 Notion으로 보낼 데이터:")
+                    logger.info(f"  - platform: {video_data_for_notion['platform']}")
+                    logger.info(f"  - thumbnail: {video_data_for_notion['thumbnail']}")
+                    logger.info(f"  - webpage_url: {video_data_for_notion['webpage_url']}")
+                    
+                    # 직접 호출 (DB를 거치지 않고!)
+                    success, result = self.notion_service.add_video_to_database(
+                        video_data=video_data_for_notion,
+                        analysis_data=video.analysis_result
+                    )
+                    
+                    if success:
+                        update_progress("notion", 98, "✅ Notion 업로드 성공!")
+                        logger.info(f"Notion 페이지 ID: {result}")
+                        logger.info(f"Notion 데이터베이스 URL: {self.notion_service.get_database_url()}")
+                    else:
+                        update_progress("notion", 98, f"⚠️ Notion 업로드 실패: {result}")
+                        logger.warning(f"Notion 업로드 실패: {result}")
                     
                 except Exception as e:
                     logger.error(f"Notion 업로드 중 오류: {str(e)}")
+                    import traceback
+                    logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
                     update_progress("notion", 98, f"⚠️ Notion 업로드 오류: {str(e)}")
             
             # 10. 임시 파일 정리
@@ -395,59 +422,6 @@ class VideoService:
             
             update_progress("complete", 100, f"✅ 영상 처리 완료: {video_id}")
             return video
-
-            if os.getenv("UPLOAD_TO_NOTION", "false").lower() == "true":
-                update_progress("notion", 82, "📝 Notion 데이터베이스에 업로드 중...")
-                
-                try:
-                    # Notion 서비스가 초기화되어 있는지 확인
-                    if not hasattr(self, 'notion_service') or self.notion_service is None:
-                        from src.services.notion_service import NotionService
-                        self.notion_service = NotionService()
-                    
-                    # 데이터 검증
-                    logger.info(f"🔍 Notion 업로드 데이터 검증")
-                    logger.info(f"  - video_data 존재: {video_data is not None}")
-                    logger.info(f"  - analysis_data 존재: {analysis_data is not None}")
-                    
-                    if video_data and analysis_data:
-                        # 필수 필드 확인
-                        logger.info(f"  - video_id: {video_data.get('video_id')}")
-                        logger.info(f"  - title: {video_data.get('title')}")
-                        logger.info(f"  - genre: {analysis_data.get('genre')}")
-                        
-                        # Notion에 추가
-                        success, result = self.notion_service.add_video_to_database(
-                            video_data, 
-                            analysis_data
-                        )
-                        
-                        if success:
-                            update_progress("notion", 85, f"✅ Notion 업로드 성공: {result}")
-                            logger.info(f"✅ Notion 업로드 성공 - Page ID: {result}")
-                        else:
-                            update_progress("notion", 85, f"⚠️ Notion 업로드 실패: {result}")
-                            logger.warning(f"Notion 업로드 실패: {result}")
-                    else:
-                        error_msg = "데이터가 불완전합니다"
-                        if not video_data:
-                            error_msg += " (video_data 없음)"
-                        if not analysis_data:
-                            error_msg += " (analysis_data 없음)"
-                        
-                        update_progress("notion", 85, f"⚠️ Notion 업로드 실패: {error_msg}")
-                        logger.error(f"Notion 업로드 실패: {error_msg}")
-                        
-                except ImportError as e:
-                    update_progress("notion", 85, "⚠️ Notion 서비스를 사용할 수 없습니다")
-                    logger.error(f"Notion 서비스 임포트 실패: {e}")
-                except Exception as e:
-                    update_progress("notion", 85, f"⚠️ Notion 업로드 중 오류: {str(e)}")
-                    logger.error(f"Notion 업로드 중 예외 발생: {e}")
-                    import traceback
-                    logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
-            else:
-                update_progress("notion", 85, "ℹ️ Notion 업로드 비활성화")
             
         except Exception as e:
             if progress_callback:
@@ -488,14 +462,15 @@ class VideoService:
                     video_id=video_id,
                     url=video_info['url'],
                     ext='mp4',
-                    thumbnail='',
-                    webpage_url=video_info['url'],
+                    thumbnail=video_info.get('thumbnail', ''),
+                    webpage_url=video_info.get('webpage_url', video_info['url']),
                     tags=video_info.get('tags', []),
                     channel_id=video_info.get('channel_id', ''),
                     categories=video_info.get('categories', []),
                     language=video_info.get('language', ''),
                     comment_count=video_info.get('comment_count', 0),
-                    age_limit=video_info.get('age_limit', 0)
+                    age_limit=video_info.get('age_limit', 0),
+                    platform=video_info.get('platform', 'youtube')
                 )
             )
             

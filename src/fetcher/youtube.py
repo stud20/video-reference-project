@@ -137,7 +137,8 @@ class YouTubeDownloader:
                 'language': info.get('language', ''),
                 'age_limit': info.get('age_limit', 0),
                 'ext': os.path.splitext(processed_file)[1][1:],
-                'thumbnail': thumbnail_file or info.get('thumbnail', ''),
+                'thumbnail': info.get('thumbnail', ''),  # 항상 URL을 사용
+                'thumbnail_file': thumbnail_file,  # 로컬 파일은 별도로
                 'webpage_url': info.get('webpage_url', url),
                 'subtitle_files': subtitle_files,
                 'platform': self._detect_platform(url),
@@ -147,8 +148,14 @@ class YouTubeDownloader:
             
             self.logger.info(f"✅ 다운로드 및 처리 완료: {safe_title}")
             self.logger.info(f"📺 채널: {result['uploader']}")
-            self.logger.info(f"👁 조회수: {result['view_count']:,}")
-            self.logger.info(f"🏷 태그: {', '.join(result['tags'][:5])}")
+            if result.get('view_count') is not None:
+                self.logger.info(f"👁 조회수: {result['view_count']:,}")
+            else:
+                self.logger.info(f"👁 조회수: 정보 없음")
+            if result.get('tags'):
+                self.logger.info(f"🏷 태그: {', '.join(result['tags'][:5])}")
+            else:
+                self.logger.info(f"🏷 태그: 없음")
             
             return result
             

@@ -29,14 +29,6 @@ class NotionService:
                             database_id: Optional[str] = None) -> Tuple[bool, str]:
         """
         영상 분석 결과를 Notion 데이터베이스에 추가하고 상세 페이지 생성
-        
-        Args:
-            video_data: 영상 기본 정보
-            analysis_data: AI 분석 결과
-            database_id: Notion 데이터베이스 ID (옵션)
-            
-        Returns:
-            (성공여부, 페이지ID or 에러메시지)
         """
         try:
             # 데이터베이스 ID 확인
@@ -45,6 +37,13 @@ class NotionService:
             
             video_id = video_data.get('video_id', 'Unknown')
             logger.info(f"🔍 영상 처리 시작 - video_id: {video_id}")
+            
+            # 디버깅: 입력 데이터 확인
+            logger.debug(f"📊 video_data 키: {list(video_data.keys())}")
+            logger.debug(f"🌐 플랫폼: {video_data.get('platform')}")
+            logger.debug(f"🔗 URL: {video_data.get('url')}")
+            logger.debug(f"📄 webpage_url: {video_data.get('webpage_url')}")
+            logger.debug(f"🖼️ thumbnail: {video_data.get('thumbnail')}")
             
             # 중복 확인
             existing_page = self.db_service.check_duplicate(video_id)
@@ -77,6 +76,7 @@ class NotionService:
             logger.error(f"{error_msg} - Video ID: {video_data.get('video_id', 'Unknown')}")
             logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
             return False, error_msg
+
     
     def _update_existing_record(self, 
                                page_id: str, 
