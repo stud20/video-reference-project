@@ -84,9 +84,11 @@ class VideoAnalysisDB:
             logger.error(f"Error deleting analyses for video {video_id}: {str(e)}")
             return False
     
+    # src/storage/db_manager.py의 save_video_info 함수 수정
+
     def save_video_info(self, video_data: Dict[str, Any]) -> int:
         """
-        영상 기본 정보 저장
+        영상 기본 정보 저장 - 확장된 메타데이터 포함
         
         Args:
             video_data: 영상 정보 딕셔너리
@@ -96,6 +98,16 @@ class VideoAnalysisDB:
                 - duration: 영상 길이
                 - platform: youtube/vimeo
                 - download_date: 다운로드 날짜
+                - uploader: 업로더/채널명 (추가)
+                - description: 영상 설명 (추가)
+                - view_count: 조회수 (추가)
+                - like_count: 좋아요 수 (추가)
+                - comment_count: 댓글 수 (추가)
+                - tags: YouTube 태그 (추가)
+                - channel_id: 채널 ID (추가)
+                - categories: 카테고리 (추가)
+                - language: 언어 (추가)
+                - upload_date: 업로드 날짜 (추가)
         
         Returns:
             document_id: 저장된 문서 ID
@@ -105,6 +117,7 @@ class VideoAnalysisDB:
         # 기존 데이터 확인
         existing = self.videos_table.search(Video.video_id == video_data['video_id'])
         
+        # 확장된 메타데이터를 포함한 레코드 생성
         video_record = {
             'video_id': video_data['video_id'],
             'url': video_data['url'],
@@ -113,14 +126,28 @@ class VideoAnalysisDB:
             'platform': video_data.get('platform', 'unknown'),
             'download_date': video_data.get('download_date', datetime.now().isoformat()),
             'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat()
+            'updated_at': datetime.now().isoformat(),
+            
+            # 확장된 메타데이터 추가
+            'uploader': video_data.get('uploader', video_data.get('channel', '')),
+            'channel': video_data.get('channel', video_data.get('uploader', '')),  # 호환성
+            'description': video_data.get('description', ''),
+            'view_count': video_data.get('view_count', 0),
+            'like_count': video_data.get('like_count', 0),
+            'comment_count': video_data.get('comment_count', 0),
+            'tags': video_data.get('tags', []),
+            'channel_id': video_data.get('channel_id', ''),
+            'categories': video_data.get('categories', []),
+            'language': video_data.get('language', ''),
+            'upload_date': video_data.get('upload_date', ''),
+            'age_limit': video_data.get('age_limit', 0),
         }
         
         if existing:
             # 업데이트
             doc_id = existing[0].doc_id
             self.videos_table.update(
-                tdb_set('updated_at', datetime.now().isoformat()),
+                video_record,
                 doc_ids=[doc_id]
             )
             logger.info(f"Updated video info for: {video_data['video_id']}")
