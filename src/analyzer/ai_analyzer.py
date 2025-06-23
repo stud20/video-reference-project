@@ -1,11 +1,11 @@
 # src/analyzer/ai_analyzer.py
-"""AI 기반 영상 장르 및 콘텐츠 분석"""
+"""AI 기반 영상 장르 및 콘텐츠 분석 - 메타데이터 강화 버전"""
 
 import os
 import base64
 import json
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 from openai import OpenAI
 from dataclasses import dataclass
@@ -57,28 +57,12 @@ class AIAnalyzer:
                 self.client = OpenAI(api_key=self.api_key)
                 self.logger.info("✅ OpenAI 클라이언트 초기화 성공")
                 
-                # 간단한 연결 테스트 (옵션)
-                # self._test_connection()
-                
             except Exception as e:
                 self.logger.error(f"❌ OpenAI 클라이언트 초기화 실패: {str(e)}")
                 self.logger.error(f"❌ 오류 타입: {type(e).__name__}")
                 import traceback
                 self.logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
                 self.client = None
-
-    def _test_connection(self):
-        """OpenAI API 연결 테스트 (옵션)"""
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "test"}],
-                max_tokens=1
-            )
-            self.logger.info("✅ OpenAI API 연결 테스트 성공")
-        except Exception as e:
-            self.logger.warning(f"⚠️ OpenAI API 연결 테스트 실패: {e}")
-            # 테스트 실패해도 클라이언트는 유지
             
     def analyze_video(self, video: Video) -> Optional[AnalysisResult]:
         """비디오 분석 수행"""
@@ -98,15 +82,22 @@ class AIAnalyzer:
             # 이미지 준비
             image_payloads = self._prepare_images(video.scenes)
             
+            # 썸네일 이미지 추가
+            thumbnail_payload = self._prepare_thumbnail(video)
+            if thumbnail_payload:
+                # 썸네일을 첫 번째 이미지로 추가
+                image_payloads.insert(0, thumbnail_payload)
+                self.logger.info("📸 썸네일 이미지 추가됨")
+            
             if not image_payloads:
                 self.logger.error("준비된 이미지가 없습니다")
                 return None
             
-            # 컨텍스트 정보 준비
-            context = self._prepare_context(video)
+            # 컨텍스트 정보 준비 (확장된 메타데이터 포함)
+            context = self._prepare_extended_context(video)
             
             # 프롬프트 생성
-            prompt = self._create_prompt(context, len(image_payloads))
+            prompt = self._create_enhanced_prompt(context, len(image_payloads))
             
             # 프롬프트 저장 (디버깅용)
             prompt_file = os.path.join(debug_dir, "api_prompt.txt")
@@ -114,7 +105,7 @@ class AIAnalyzer:
                 f.write(f"=== API 요청 정보 ===\n")
                 f.write(f"시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"이미지 수: {len(image_payloads)}\n")
-                f.write(f"컨텍스트: {context}\n\n")
+                f.write(f"컨텍스트: {json.dumps(context, ensure_ascii=False, indent=2)}\n\n")
                 f.write(f"=== 프롬프트 ===\n")
                 f.write(prompt)
                 f.write(f"\n\n=== 이미지 정보 ===\n")
@@ -147,6 +138,14 @@ class AIAnalyzer:
             if not result:
                 self.logger.error("파싱 실패")
                 return None
+            
+            # YouTube 태그와 병합
+            if video.metadata and video.metadata.tags:
+                youtube_tags = [tag for tag in video.metadata.tags if tag and len(tag) > 1]
+                # 중복 제거하면서 병합
+                merged_tags = list(set(result.tags + youtube_tags))
+                result.tags = merged_tags[:20]  # 최대 20개로 제한
+                self.logger.info(f"🏷️ YouTube 태그 {len(youtube_tags)}개 병합됨")
             
             # 파싱 결과 저장 (디버깅용)
             parsing_file = os.path.join(debug_dir, "parsing_result.txt")
@@ -214,39 +213,122 @@ class AIAnalyzer:
         self.logger.info(f"📸 {len(image_payloads)}개 이미지 준비 완료")
         return image_payloads
     
-    def _prepare_context(self, video: Video) -> str:
-        """분석을 위한 컨텍스트 정보 준비"""
-        context_parts = []
+    def _prepare_thumbnail(self, video: Video) -> Optional[Dict]:
+        """썸네일 이미지 준비"""
+        if not video.metadata or not video.metadata.thumbnail:
+            return None
+        
+        # 썸네일이 로컬 파일인지 확인
+        thumbnail_path = None
+        if os.path.exists(video.metadata.thumbnail):
+            thumbnail_path = video.metadata.thumbnail
+        else:
+            # session_dir에서 썸네일 찾기
+            possible_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+            for ext in possible_extensions:
+                test_path = os.path.join(video.session_dir, f"thumbnail{ext}")
+                if os.path.exists(test_path):
+                    thumbnail_path = test_path
+                    break
+        
+        if not thumbnail_path:
+            self.logger.debug("썸네일 파일을 찾을 수 없음")
+            return None
+        
+        try:
+            with open(thumbnail_path, "rb") as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            payload = {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_data}",
+                    "detail": "low"  # 썸네일은 low 품질로
+                }
+            }
+            
+            self.logger.info(f"✅ 썸네일 이미지 준비 완료: {thumbnail_path}")
+            return payload
+            
+        except Exception as e:
+            self.logger.error(f"썸네일 로드 실패: {thumbnail_path} - {e}")
+            return None
+    
+    def _prepare_extended_context(self, video: Video) -> Dict[str, Any]:
+        """확장된 컨텍스트 정보 준비"""
+        context = {
+            "title": "",
+            "uploader": "",
+            "duration": "",
+            "description": "",
+            "tags": [],
+            "view_count": 0
+        }
         
         if video.metadata:
-            if video.metadata.title:
-                context_parts.append(f"제목: {video.metadata.title}")
+            context["title"] = video.metadata.title or ""
+            context["uploader"] = video.metadata.uploader or ""
             
+            # 영상 길이 포맷팅
             if video.metadata.duration:
-                minutes = video.metadata.duration // 60
-                seconds = video.metadata.duration % 60
-                context_parts.append(f"길이: {minutes}분 {seconds}초")
+                minutes = int(video.metadata.duration // 60)
+                seconds = int(video.metadata.duration % 60)
+                context["duration"] = f"{minutes}분 {seconds}초"
+            
+            context["description"] = video.metadata.description[:500] if video.metadata.description else ""  # 설명은 500자로 제한
+            context["tags"] = video.metadata.tags[:10] if video.metadata.tags else []  # 상위 10개 태그만
+            context["view_count"] = video.metadata.view_count or 0
         
-        return " / ".join(context_parts) if context_parts else "정보 없음"
+        return context
     
-    def _create_prompt(self, context: str, image_count: int) -> str:
-        """API 프롬프트 생성"""
-        prompt = f"""영상 정보: {context}
+    def _create_enhanced_prompt(self, context: Dict[str, Any], image_count: int) -> str:
+        """강화된 API 프롬프트 생성"""
+        # 메타데이터 정보 구성
+        metadata_info = []
+        
+        if context["title"]:
+            metadata_info.append(f"제목: {context['title']}")
+        
+        if context["uploader"]:
+            metadata_info.append(f"업로더/채널: {context['uploader']}")
+        
+        if context["duration"]:
+            metadata_info.append(f"영상 길이: {context['duration']}")
+        
+        if context["view_count"] > 0:
+            metadata_info.append(f"조회수: {context['view_count']:,}회")
+        
+        if context["tags"]:
+            metadata_info.append(f"YouTube 태그: {', '.join(context['tags'])}")
+        
+        metadata_text = "\n".join(metadata_info)
+        
+        # 설명 텍스트 추가
+        description_text = ""
+        if context["description"]:
+            description_text = f"\n\n영상 설명:\n{context['description']}"
+        
+        prompt = f"""영상 메타데이터:
+{metadata_text}{description_text}
 
-위 영상에서 추출한 {image_count}개의 대표 장면을 분석해주세요.
+위 영상에서 추출한 {image_count}개의 이미지를 분석해주세요. 
+첫 번째 이미지는 썸네일이며, 나머지는 영상의 대표 장면들입니다.
 
-다음 7개 항목을 모두 작성해주세요. A2와 A3는 반드시 200자 이상 상세히 작성하세요.
+제공된 메타데이터(제목, 설명, 태그 등)를 참고하여 더 정확한 분석을 수행하되,
+실제 이미지 내용이 메타데이터와 다를 경우 이미지 내용을 우선시해주세요.
+
+다음 7개 항목을 모두 작성해주세요. 각 항목의 답변에는 "장르 판단 이유:", "영상의 특징:" 같은 레이블을 포함하지 말고 내용만 작성하세요.
 
 분석 항목:
 A1. 영상 장르 (다음 중 하나만 선택): {', '.join(self.GENRES)}
-A2. 장르 판단 이유 (시각적 특징, 연출 스타일, 정보 전달 방식 등을 200자 이상 상세히 설명)
-A3. 영상의 특징 및 특이사항 (색감, 편집, 카메라워크, 분위기 등을 200자 이상 상세히 설명)
-A4. 관련 태그 10개 이상 (쉼표로 구분)
+A2. 장르 판단 이유 (시각적 특징, 연출 스타일, 정보 전달 방식, 메타데이터 등을 종합하여 200자 이상 상세히 설명)
+A3. 영상의 특징 및 특이사항 (색감, 편집, 카메라워크, 분위기, 메시지 등을 200자 이상 상세히 설명)
+A4. 관련 태그 10개 이상 (쉼표로 구분, # 기호 없이, YouTube 태그와 중복되지 않는 새로운 태그 위주로)
 A5. 표현형식 (다음 중 하나만 선택): {', '.join(self.FORMAT_TYPES)}
 A6. 전반적인 분위기와 톤
 A7. 예상 타겟 고객층
 
-위 형식을 정확히 지켜서 답변해주세요."""
+중요: 각 답변은 레이블 없이 내용만 작성하세요."""
         
         return prompt
     
@@ -256,7 +338,7 @@ A7. 예상 타겟 고객층
             messages = [
                 {
                     "role": "system",
-                    "content": "당신은 광고 영상 전문 분석가입니다. 주어진 이미지들을 보고 영상의 장르, 특징, 타겟 등을 상세히 분석해주세요."
+                    "content": "당신은 광고 영상 전문 분석가입니다. 주어진 이미지들과 메타데이터를 종합적으로 분석하여 영상의 장르, 특징, 타겟 등을 상세히 분석해주세요. 메타데이터는 참고용이며, 실제 이미지 내용을 우선시하여 분석해주세요."
                 },
                 {
                     "role": "user",
@@ -294,12 +376,18 @@ A7. 예상 타겟 고객층
             return None
     
     def _parse_response(self, response: str) -> Optional[AnalysisResult]:
-        """GPT-4 응답 파싱"""
+        """GPT-4 응답 파싱 - 개선된 버전"""
         if not response or len(response) < 100:
             self.logger.error(f"응답이 너무 짧거나 비어있음: {len(response) if response else 0}자")
             return None
         
         self.logger.info("📝 응답 파싱 시작...")
+        
+        # 응답을 줄 단위로 분리
+        lines = response.strip().split('\n')
+        
+        # 빈 줄 제거
+        lines = [line.strip() for line in lines if line.strip()]
         
         # 파싱 결과 초기화
         parsed = {
@@ -312,37 +400,72 @@ A7. 예상 타겟 고객층
             'target_audience': ''
         }
         
-        # 정규표현식으로 파싱
-        patterns = {
-            'genre': r'A1[\.:\s]*([^\n]+)',
-            'reason': r'A2[\.:\s]*([\s\S]+?)(?=A3[\.:\s]|$)',
-            'features': r'A3[\.:\s]*([\s\S]+?)(?=A4[\.:\s]|$)',
-            'tags': r'A4[\.:\s]*([\s\S]+?)(?=A5[\.:\s]|$)',
-            'format_type': r'A5[\.:\s]*([^\n]+)',
-            'mood': r'A6[\.:\s]*([\s\S]+?)(?=A7[\.:\s]|$)',
-            'target_audience': r'A7[\.:\s]*([\s\S]+?)$'
-        }
+        # 텍스트를 섹션으로 분리 (두 줄 이상의 빈 줄로 구분)
+        sections = response.strip().split('\n\n')
         
-        for key, pattern in patterns.items():
-            match = re.search(pattern, response, re.MULTILINE | re.IGNORECASE)
-            if match:
-                value = match.group(1).strip()
+        # 섹션이 7개가 아니면 다른 방식으로 파싱 시도
+        if len(sections) < 7:
+            # 각 줄을 하나씩 확인하면서 파싱
+            self.logger.info(f"섹션 수: {len(sections)}, 대체 파싱 방식 사용")
+            
+            # 첫 번째 줄은 장르
+            if lines:
+                parsed['genre'] = lines[0].strip()
+                self.logger.debug(f"장르: {parsed['genre']}")
+            
+            # 나머지 내용을 하나의 텍스트로 합쳐서 파싱
+            remaining_text = '\n'.join(lines[1:])
+            
+            # 각 섹션을 구분할 수 있는 키워드나 패턴 찾기
+            # 긴 텍스트는 reason과 features일 가능성이 높음
+            paragraphs = [p.strip() for p in remaining_text.split('\n\n') if p.strip()]
+            
+            if len(paragraphs) >= 6:
+                parsed['reason'] = paragraphs[0]
+                parsed['features'] = paragraphs[1]
                 
-                # 대괄호 제거
-                value = value.strip('[]')
+                # 태그 찾기 (쉼표로 구분된 리스트)
+                for p in paragraphs[2:]:
+                    if ',' in p and len(p.split(',')) > 5:
+                        parsed['tags'] = [tag.strip() for tag in p.split(',')]
+                        break
                 
-                if key == 'tags':
-                    # 태그는 쉼표로 분리
-                    parsed[key] = [tag.strip() for tag in value.split(',') if tag.strip()]
-                else:
-                    parsed[key] = value
+                # 표현형식 찾기 (FORMAT_TYPES 중 하나)
+                for p in paragraphs:
+                    for fmt in self.FORMAT_TYPES:
+                        if fmt in p and len(p) < 20:  # 짧은 텍스트
+                            parsed['format_type'] = fmt
+                            break
                 
-                self.logger.debug(f"파싱 - {key}: {value[:50]}...")
+                # 나머지 짧은 문장들은 mood와 target_audience
+                short_paragraphs = [p for p in paragraphs if len(p) < 200 and p not in [parsed['reason'], parsed['features']]]
+                if len(short_paragraphs) >= 2:
+                    parsed['mood'] = short_paragraphs[-2]
+                    parsed['target_audience'] = short_paragraphs[-1]
         
-        # 파싱 결과 검증
+        else:
+            # 섹션이 7개 이상이면 순서대로 할당
+            parsed['genre'] = sections[0].strip()
+            parsed['reason'] = sections[1].strip()
+            parsed['features'] = sections[2].strip()
+            
+            # 태그 처리
+            tags_text = sections[3].strip()
+            parsed['tags'] = [tag.strip() for tag in tags_text.split(',')]
+            
+            parsed['format_type'] = sections[4].strip()
+            parsed['mood'] = sections[5].strip()
+            parsed['target_audience'] = sections[6].strip()
+        
+        # 파싱 결과 검증 및 정리
         if not parsed['genre']:
             self.logger.error("장르가 파싱되지 않음")
             return None
+        
+        # 장르가 유효한지 확인
+        if parsed['genre'] not in self.GENRES:
+            self.logger.warning(f"파싱된 장르가 목록에 없음: {parsed['genre']}")
+            # 가장 유사한 장르 찾기 (옵션)
         
         # 결과 생성
         result = AnalysisResult(
@@ -361,15 +484,17 @@ A7. 예상 타겟 고객층
     
     def _save_analysis_result(self, video: Video, result: AnalysisResult):
         """분석 결과 저장"""
-        # Video 객체에 결과 저장
+        # Video 객체에 결과 저장 (DB 스키마에 맞게 키 이름 변경)
         video.analysis_result = {
             'genre': result.genre,
-            'reason': result.reason,
+            'reasoning': result.reason,  # reason -> reasoning
             'features': result.features,
             'tags': result.tags,
-            'format_type': result.format_type,
-            'mood': result.mood,
-            'target_audience': result.target_audience
+            'expression_style': result.format_type,  # format_type -> expression_style
+            'mood_tone': result.mood,  # mood -> mood_tone
+            'target_audience': result.target_audience,
+            'model_used': os.getenv("OPENAI_MODEL", "gpt-4o"),
+            'analysis_date': datetime.now().isoformat()
         }
         
         # JSON 파일로 저장
@@ -377,7 +502,7 @@ A7. 예상 타겟 고객층
         with open(result_path, 'w', encoding='utf-8') as f:
             json.dump(video.analysis_result, f, ensure_ascii=False, indent=2)
         
-        # 텍스트 파일로도 저장
+        # 텍스트 파일로도 저장 (사람이 읽기 쉬운 형식)
         result_text_path = os.path.join(video.session_dir, "analysis_result.txt")
         with open(result_text_path, 'w', encoding='utf-8') as f:
             f.write(f"=== AI 영상 분석 결과 ===\n\n")

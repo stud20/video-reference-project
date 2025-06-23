@@ -6,33 +6,51 @@ from datetime import datetime
 
 @dataclass
 class VideoMetadata:
-    """비디오 메타데이터"""
-    title: str = ""
-    duration: int = 0  # 초 단위
-    uploader: str = ""
+    """영상 메타데이터 - 확장된 버전"""
+    video_id: str
+    title: str
+    url: str
+    duration: float  # 초 단위
+    uploader: str = "Unknown"  # 채널명
+    channel_id: str = ""
+    description: str = ""  # 영상 설명
     upload_date: str = ""
-    description: str = ""
-    video_id: str = ""
-    ext: str = "mp4"
-    view_count: int = 0  # 추가
-    like_count: int = 0  # 추가
-    thumbnail: str = ""  # 추가
-    webpage_url: str = ""  # 추가
+    platform: str = "unknown"
+    view_count: int = 0  # 조회수
+    like_count: int = 0  # 좋아요 수
+    comment_count: int = 0  # 댓글 수
+    tags: List[str] = field(default_factory=list)  # 영상 태그
+    categories: List[str] = field(default_factory=list)  # 카테고리
+    language: str = ""  # 언어
+    subtitle_files: Dict[str, str] = field(default_factory=dict)  # 자막 파일 경로
+    age_limit: int = 0  # 연령 제한
+    ext: str = "mp4"  # 파일 확장자
+    thumbnail: str = ""  # 썸네일 URL
+    webpage_url: str = ""  # 웹페이지 URL
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict:
         """딕셔너리로 변환"""
         return {
+            'video_id': self.video_id,
             'title': self.title,
+            'url': self.url,
             'duration': self.duration,
             'uploader': self.uploader,
-            'upload_date': self.upload_date,
+            'channel_id': self.channel_id,
             'description': self.description,
-            'video_id': self.video_id,
-            'ext': self.ext,
+            'upload_date': self.upload_date,
+            'platform': self.platform,
             'view_count': self.view_count,
             'like_count': self.like_count,
+            'comment_count': self.comment_count,
+            'tags': self.tags,
+            'categories': self.categories,
+            'language': self.language,
+            'age_limit': self.age_limit,
+            'ext': self.ext,
             'thumbnail': self.thumbnail,
-            'webpage_url': self.webpage_url
+            'webpage_url': self.webpage_url,
+            'subtitle_files': self.subtitle_files,
         }
 
 
@@ -75,7 +93,8 @@ class Video:
             'metadata': self.metadata.to_dict() if self.metadata else None,
             'scenes': [scene.to_dict() for scene in self.scenes],
             'analysis_result': self.analysis_result,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'session_dir': self.session_dir
         }
     
     def get_scene_count(self) -> int:
@@ -85,8 +104,8 @@ class Video:
     def get_duration_str(self) -> str:
         """시간을 MM:SS 형식으로 반환"""
         if self.metadata and self.metadata.duration:
-            minutes = self.metadata.duration // 60
-            seconds = self.metadata.duration % 60
+            minutes = int(self.metadata.duration // 60)
+            seconds = int(self.metadata.duration % 60)
             return f"{minutes:02d}:{seconds:02d}"
         return "00:00"
     
@@ -98,6 +117,9 @@ class Video:
         """분석 결과에서 태그 추출"""
         if self.analysis_result and 'tags' in self.analysis_result:
             return self.analysis_result['tags']
+        # 메타데이터에서 태그 가져오기 (YouTube 태그)
+        elif self.metadata and self.metadata.tags:
+            return self.metadata.tags
         return []
     
     def get_genre(self) -> str:

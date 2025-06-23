@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()  # .env 파일 로드
 import os
 import re
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -92,37 +92,61 @@ class VideoService:
         
         raise ValueError(f"지원하지 않는 비디오 URL 형식입니다: {url}")
     
-    def process_video(self, url: str, force_reanalyze: bool = False) -> Video:
+    def process_video(self, url: str, force_reanalyze: bool = False, progress_callback: Optional[Callable] = None) -> Video:
         """
         영상 다운로드, 씬 추출, AI 분석 전체 프로세스 실행
         
         Args:
             url: 분석할 영상 URL
             force_reanalyze: 기존 분석 결과가 있어도 재분석 여부
+            progress_callback: 진행 상황 업데이트 콜백 함수
+                              callback(step: str, progress: int, message: str)
             
         Returns:
             처리 완료된 Video 객체
         """
         try:
+            # 진행 상황 업데이트 함수
+            def update_progress(step: str, progress: int, message: str):
+                if progress_callback:
+                    progress_callback(step, progress, message)
+                logger.info(message)
+            
             # 1. URL 파싱
+            update_progress("parsing", 5, "🔍 영상 URL 분석 중...")
             platform, video_id = self._parse_video_url(url)
-            logger.info(f"영상 처리 시작: {platform} - {video_id}")
+            update_progress("parsing", 10, f"✅ 플랫폼 확인: {platform} - {video_id}")
             
             # 2. 기존 분석 결과 확인
             if not force_reanalyze:
+                update_progress("checking", 12, "📊 기존 분석 결과 확인 중...")
                 existing_analysis = self.db.get_latest_analysis(video_id)
                 if existing_analysis:
-                    logger.info(f"기존 분석 결과 발견: {video_id}")
+                    update_progress("checking", 15, f"✅ 기존 분석 결과 발견: {video_id}")
                     # 기존 결과를 Video 객체로 변환
                     video = self._create_video_from_db(video_id, existing_analysis)
                     if video:
+                        update_progress("complete", 100, "✅ 기존 분석 결과를 불러왔습니다")
                         return video
             
             # 3. 영상 다운로드
-            logger.info(f"영상 다운로드 시작: {url}")
+            update_progress("download", 20, "📥 영상 정보 가져오는 중...")
+            
+            # 다운로드 진행 상황을 추적하기 위한 래퍼
+            original_download = self.downloader.download
+            
+            def download_with_progress(url):
+                update_progress("download", 25, "📥 영상 다운로드 시작...")
+                result = original_download(url)
+                update_progress("download", 35, f"✅ 다운로드 완료: {result.get('title', 'Unknown')}")
+                return result
+            
+            self.downloader.download = download_with_progress
             download_result = self.downloader.download(url)
+            self.downloader.download = original_download  # 원래 함수로 복원
             
             # 4. Video 객체 생성
+            update_progress("metadata", 40, "📋 메타데이터 처리 중...")
             video = Video(
                 session_id=video_id,
                 url=url,
@@ -136,16 +160,25 @@ class VideoService:
                     view_count=download_result.get('view_count', 0),
                     like_count=download_result.get('like_count', 0),
                     video_id=video_id,
+                    url=url,
                     ext=download_result.get('ext', 'mp4'),
                     thumbnail=download_result.get('thumbnail', ''),
-                    webpage_url=download_result.get('webpage_url', url)
+                    webpage_url=download_result.get('webpage_url', url),
+                    tags=download_result.get('tags', []),
+                    categories=download_result.get('categories', []),
+                    language=download_result.get('language', ''),
+                    channel_id=download_result.get('channel_id', ''),
+                    comment_count=download_result.get('comment_count', 0),
+                    age_limit=download_result.get('age_limit', 0),
+                    subtitle_files=download_result.get('subtitle_files', {})
                 )
             )
             
-            # session_dir 속성 추가 (ai_analyzer가 사용)
+            # session_dir 속성 추가
             video.session_dir = os.path.dirname(download_result['filepath'])
             
             # 5. DB에 영상 정보 저장
+            update_progress("database", 45, "💾 데이터베이스에 정보 저장 중...")
             video_data = {
                 'video_id': video_id,
                 'url': url,
@@ -155,12 +188,18 @@ class VideoService:
                 'download_date': datetime.now().isoformat(),
                 'uploader': video.metadata.uploader,
                 'description': video.metadata.description,
-                'view_count': video.metadata.view_count
+                'view_count': video.metadata.view_count,
+                'tags': video.metadata.tags,
+                'channel_id': video.metadata.channel_id,
+                'categories': video.metadata.categories,
+                'language': video.metadata.language,
+                'like_count': video.metadata.like_count,
+                'comment_count': video.metadata.comment_count
             }
             self.db.save_video_info(video_data)
             
             # 6. 씬 추출
-            logger.info("씬 추출 시작")
+            update_progress("extract", 50, "🎬 주요 씬 추출 시작...")
             scenes_result = self.scene_extractor.extract_scenes(
                 video.local_path, 
                 video.session_id
@@ -169,30 +208,27 @@ class VideoService:
             # Scene 객체로 변환
             video.scenes = []
             
-            # scenes_result가 딕셔너리인지 확인
+            # scenes_result 처리
             if isinstance(scenes_result, dict):
-                # 'scenes' 키가 있는 경우
                 if 'scenes' in scenes_result:
                     scenes_list = scenes_result['scenes']
-                # 'selected_images' 키만 있는 경우
                 elif 'selected_images' in scenes_result:
                     scenes_list = scenes_result['selected_images']
                 else:
-                    logger.warning("씬 추출 결과에서 scenes 또는 selected_images를 찾을 수 없습니다")
                     scenes_list = []
-            # scenes_result가 리스트인 경우
             elif isinstance(scenes_result, list):
                 scenes_list = scenes_result
             else:
-                logger.error(f"예상치 못한 씬 추출 결과 타입: {type(scenes_result)}")
                 scenes_list = []
             
             # 씬 데이터 처리
-            for scene_data in scenes_list:
-                # 이미 Scene 객체인 경우
+            scene_count = len(scenes_list)
+            for i, scene_data in enumerate(scenes_list):
+                progress = 50 + int((i / scene_count) * 10) if scene_count > 0 else 60
+                update_progress("extract", progress, f"🎬 씬 처리 중... ({i+1}/{scene_count})")
+                
                 if isinstance(scene_data, Scene):
                     video.scenes.append(scene_data)
-                # scene_data가 딕셔너리인 경우
                 elif isinstance(scene_data, dict):
                     scene = Scene(
                         timestamp=scene_data.get('timestamp', 0.0),
@@ -200,47 +236,41 @@ class VideoService:
                         scene_type=scene_data.get('type', 'mid')
                     )
                     video.scenes.append(scene)
-                # scene_data가 문자열(경로)인 경우
                 elif isinstance(scene_data, str):
                     scene = Scene(
-                        timestamp=0.0,  # 타임스탬프 정보 없음
+                        timestamp=0.0,
                         frame_path=scene_data,
                         scene_type='mid'
                     )
                     video.scenes.append(scene)
-                else:
-                    logger.warning(f"알 수 없는 씬 데이터 타입: {type(scene_data)}")
-                    continue
             
-            # 7. AI 분석 (수정된 부분)
-            logger.info(f"🤖 AI 분석기 상태 확인: {self.ai_analyzer is not None}")
-            logger.info(f"🎬 추출된 씬 수: {len(video.scenes) if video.scenes else 0}")
-            logger.info(f"🔑 OpenAI API 키 설정: {'있음' if os.getenv('OPENAI_API_KEY') else '없음'}")
+            update_progress("extract", 60, f"✅ {len(video.scenes)}개 씬 추출 완료")
             
+            # 7. AI 분석
             if self.ai_analyzer and video.scenes:
                 try:
-                    logger.info("🤖 AI 영상 분석 시작")
+                    update_progress("analyze", 65, "🤖 AI 영상 분석 시작...")
+                    update_progress("analyze", 70, "🤖 이미지 준비 중...")
                     
-                    # AIAnalyzer는 Video 객체를 직접 받음
+                    # AI 분석 실행
                     analysis_result = self.ai_analyzer.analyze_video(video)
                     
-                    logger.info(f"🔍 AI 분석 결과 타입: {type(analysis_result)}")
-                    
                     if analysis_result:
-                        logger.info(f"✅ AI 분석 성공: {getattr(analysis_result, 'genre', 'Unknown')}")
+                        update_progress("analyze", 75, f"✅ AI 분석 성공: {getattr(analysis_result, 'genre', 'Unknown')}")
                         
-                        # analysis_result는 AnalysisResult 객체
+                        # 분석 결과 저장
                         video.analysis_result = {
                             'genre': getattr(analysis_result, 'genre', ''),
-                            'reasoning': getattr(analysis_result, 'reason', ''),  # 'reason' -> 'reasoning'
+                            'reasoning': getattr(analysis_result, 'reason', ''),
                             'features': getattr(analysis_result, 'features', ''),
                             'tags': getattr(analysis_result, 'tags', []),
-                            'expression_style': getattr(analysis_result, 'format_type', ''),  # 'format_type' -> 'expression_style'
-                            'mood_tone': getattr(analysis_result, 'mood', ''),  # 'mood' -> 'mood_tone'
+                            'expression_style': getattr(analysis_result, 'format_type', ''),
+                            'mood_tone': getattr(analysis_result, 'mood', ''),
                             'target_audience': getattr(analysis_result, 'target_audience', '')
                         }
                         
-                        # 8. 분석 결과 DB에 저장
+                        # DB에 저장
+                        update_progress("analyze", 78, "💾 분석 결과 저장 중...")
                         analysis_data = {
                             'genre': getattr(analysis_result, 'genre', ''),
                             'reasoning': getattr(analysis_result, 'reason', ''),
@@ -250,43 +280,65 @@ class VideoService:
                             'mood_tone': getattr(analysis_result, 'mood', ''),
                             'target_audience': getattr(analysis_result, 'target_audience', ''),
                             'analyzed_scenes': [os.path.basename(scene.frame_path) for scene in video.scenes[:getattr(self.ai_analyzer, 'max_images', 10)]],
-                            'token_usage': {},  # 기존 ai_analyzer는 토큰 정보를 반환하지 않음
+                            'token_usage': {},
                             'model_used': os.getenv('OPENAI_MODEL', 'gpt-4o')
                         }
                         self.db.save_analysis_result(video_id, analysis_data)
-                        
-                        logger.info(f"💾 DB 저장 완료 - 장르: {getattr(analysis_result, 'genre', 'Unknown')}")
+                        update_progress("analyze", 80, "✅ AI 분석 완료")
                     else:
-                        logger.warning("⚠️ AI 분석 결과가 None입니다")
+                        update_progress("analyze", 80, "⚠️ AI 분석 결과가 없습니다")
                         
                 except Exception as e:
-                    logger.error(f"❌ AI 분석 중 오류 발생: {str(e)}")
-                    logger.error(f"❌ 오류 상세: {type(e).__name__}: {e}")
-                    import traceback
-                    logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
-                    # AI 분석 실패해도 전체 프로세스는 계속 진행
+                    update_progress("analyze", 80, f"⚠️ AI 분석 중 오류: {str(e)}")
+                    logger.error(f"AI 분석 오류: {e}")
             else:
-                # 조건 미충족 이유 로깅
                 if not self.ai_analyzer:
-                    logger.info("ℹ️ AI 분석기가 초기화되지 않음 - OpenAI API 키를 확인하세요")
-                elif not video.scenes:
-                    logger.info("ℹ️ 추출된 씬이 없어 AI 분석을 건너뜁니다")
+                    update_progress("analyze", 80, "ℹ️ AI 분석기가 비활성화되어 있습니다")
                 else:
-                    logger.info("ℹ️ AI 분석 조건을 만족하지 않음")
+                    update_progress("analyze", 80, "ℹ️ 추출된 씬이 없어 AI 분석을 건너뜁니다")
             
-            # 9. 스토리지 업로드 (기존과 동일)
+            # 8. 스토리지 업로드
             if self.storage_manager.storage_type != StorageType.LOCAL:
-                logger.info("스토리지 업로드 시작")
+                update_progress("upload", 85, "📤 스토리지 업로드 시작...")
+                
+                # 파일 수 계산
+                file_count = 1  # 비디오 파일
+                file_count += len(video.scenes)  # 씬 이미지들
+                if video.analysis_result:
+                    file_count += 1  # 분석 결과 JSON
+                
+                uploaded = 0
+                
+                # 업로드 진행 상황을 추적하는 래퍼
+                original_upload = self.storage_manager.upload_file
+                
+                def upload_with_progress(local_path, remote_path):
+                    nonlocal uploaded
+                    filename = os.path.basename(local_path)
+                    update_progress("upload", 85 + int((uploaded / file_count) * 10), f"📤 업로드 중: {filename}")
+                    result = original_upload(local_path, remote_path)
+                    uploaded += 1
+                    return result
+                
+                self.storage_manager.upload_file = upload_with_progress
                 self._upload_to_storage(video)
+                self.storage_manager.upload_file = original_upload  # 원래 함수로 복원
+                
+                update_progress("upload", 95, "✅ 스토리지 업로드 완료")
+            else:
+                update_progress("upload", 95, "ℹ️ 로컬 스토리지 사용 중")
             
-            # 10. 임시 파일 정리 (기존과 동일)
+            # 9. 임시 파일 정리
             if os.getenv("CLEANUP_TEMP_FILES", "false").lower() == "true":
+                update_progress("cleanup", 98, "🗑️ 임시 파일 정리 중...")
                 self._cleanup_temp_files(video)
             
-            logger.info(f"영상 처리 완료: {video_id}")
+            update_progress("complete", 100, f"✅ 영상 처리 완료: {video_id}")
             return video
             
         except Exception as e:
+            if progress_callback:
+                progress_callback("error", 0, f"❌ 오류 발생: {str(e)}")
             logger.error(f"영상 처리 중 오류 발생: {str(e)}")
             raise
     
@@ -311,7 +363,7 @@ class VideoService:
             video = Video(
                 session_id=video_id,
                 url=video_info['url'],
-                local_path=None,  # 이미 다운로드된 파일 경로는 포함하지 않음
+                local_path=None,
                 metadata=VideoMetadata(
                     title=video_info.get('title', ''),
                     duration=video_info.get('duration', 0),
@@ -321,9 +373,16 @@ class VideoService:
                     view_count=video_info.get('view_count', 0),
                     like_count=video_info.get('like_count', 0),
                     video_id=video_id,
+                    url=video_info['url'],
                     ext='mp4',
                     thumbnail='',
-                    webpage_url=video_info['url']
+                    webpage_url=video_info['url'],
+                    tags=video_info.get('tags', []),
+                    channel_id=video_info.get('channel_id', ''),
+                    categories=video_info.get('categories', []),
+                    language=video_info.get('language', ''),
+                    comment_count=video_info.get('comment_count', 0),
+                    age_limit=video_info.get('age_limit', 0)
                 )
             )
             
@@ -380,7 +439,6 @@ class VideoService:
             
             for file_path in files_to_upload:
                 filename = os.path.basename(file_path)
-                # 파일명에서 특수문자 처리 (언더스코어는 유지)
                 safe_filename = filename.replace('*', '_').replace('/', '_')
                 remote_path = f"{remote_base_path}/{safe_filename}"
                 
