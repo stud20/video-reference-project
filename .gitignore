@@ -54,3 +54,7 @@ dist/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+#ReferenceData
+data/
+results/
