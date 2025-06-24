@@ -1,272 +1,318 @@
 # src/ui/pages/analyze_page.py
 """
-Analyze 페이지 - 영상 분석 인터페이스
+분석 페이지 - 비디오 임베드 및 필름스트립 UI 포함
 """
 
 import streamlit as st
 import time
-from datetime import datetime
+import re
+from typing import Dict, Any, List, Optional
+from handlers.video_handler import handle_video_analysis
+
+
+def get_video_embed_html(url: str) -> Optional[str]:
+    """비디오 URL에서 임베드 HTML 생성"""
+    if not url:
+        return None
+    
+    # YouTube URL 처리
+    if "youtube.com" in url or "youtu.be" in url:
+        # 다양한 YouTube URL 형식 처리
+        video_id = None
+        
+        # youtu.be 형식
+        if "youtu.be" in url:
+            match = re.search(r'youtu\.be/([a-zA-Z0-9_-]+)', url)
+            if match:
+                video_id = match.group(1)
+        # youtube.com/watch 형식
+        else:
+            match = re.search(r'[?&]v=([a-zA-Z0-9_-]+)', url)
+            if match:
+                video_id = match.group(1)
+        
+        if video_id:
+            return f'<iframe width="100%" height="400" src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen></iframe>'
+    
+    # Vimeo URL 처리
+    elif "vimeo.com" in url:
+        match = re.search(r'vimeo\.com/(\d+)', url)
+        if match:
+            video_id = match.group(1)
+            return f'<iframe width="100%" height="400" src="https://player.vimeo.com/video/{video_id}" frameborder="0" allowfullscreen></iframe>'
+    
+    return None
+
+
+def create_filmstrip_html(scenes: List[Dict[str, Any]], thumbnail_path: Optional[str] = None) -> str:
+    """씬 이미지들로 필름스트립 HTML 생성"""
+    if not scenes and not thumbnail_path:
+        return ""
+    
+    filmstrip_html = '<div class="filmstrip-container">'
+    
+    # 썸네일 추가 (있는 경우)
+    if thumbnail_path:
+        filmstrip_html += f'''
+        <div class="filmstrip-item">
+            <img src="{thumbnail_path}" alt="썸네일" onerror="this.src='https://via.placeholder.com/200x120/667eea/ffffff?text=썸네일'">
+            <div class="filmstrip-label">썸네일</div>
+        </div>
+        '''
+    
+    # 씬 이미지들 추가
+    for i, scene in enumerate(scenes):
+        # scene이 dict인 경우와 객체인 경우 모두 처리
+        if isinstance(scene, dict):
+            frame_path = scene.get('frame_path', '')
+            timestamp = scene.get('timestamp', 0)
+        else:
+            frame_path = getattr(scene, 'frame_path', '')
+            timestamp = getattr(scene, 'timestamp', 0)
+        
+        # 로컬 경로를 웹에서 접근 가능한 URL로 변환 (실제 구현시 필요)
+        # 여기서는 placeholder 이미지 사용
+        img_src = f"https://via.placeholder.com/200x120/764ba2/ffffff?text=씬+{i+1}"
+        
+        filmstrip_html += f'''
+        <div class="filmstrip-item">
+            <img src="{img_src}" alt="씬 {i+1} ({timestamp:.1f}초)">
+            <div class="filmstrip-label">씬 {i+1} ({timestamp:.1f}초)</div>
+        </div>
+        '''
+    
+    filmstrip_html += '</div>'
+    return filmstrip_html
 
 
 def render_analyze_page():
-    """Analyze 페이지 렌더링"""
-    
-    # 페이지 상태 관리
-    if 'analyzing' not in st.session_state:
-        st.session_state.analyzing = False
-    if 'analysis_complete' not in st.session_state:
-        st.session_state.analysis_complete = False
-    if 'show_input' not in st.session_state:
-        st.session_state.show_input = True
-    
-    # 페이드 애니메이션을 위한 컨테이너
-    animation_container = st.empty()
-    
-    # 상태에 따른 렌더링
-    if st.session_state.show_input and not st.session_state.analyzing and not st.session_state.analysis_complete:
-        # 입력 UI 표시
-        with animation_container.container():
-            render_input_ui()
-    
-    elif st.session_state.analyzing:
-        # 진행 상황 표시
-        with animation_container.container():
-            render_progress_ui()
-    
-    elif st.session_state.analysis_complete:
-        # 결과 표시
-        with animation_container.container():
-            render_results_ui()
-
-
-def render_input_ui():
-    """입력 UI 렌더링"""
-    # 빈 공간으로 수직 중앙 정렬
-    for _ in range(10):
-        st.write("")
-    
-    # 중앙 정렬을 위한 컬럼 사용
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        # 페이드인 애니메이션
-        st.markdown("""
-        <style>
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .fade-in-form {
-                animation: fadeIn 0.5s ease-out;
-            }
-        </style>
-        <div class="fade-in-form">
-        """, unsafe_allow_html=True)
+    """분석 페이지 렌더링"""
+    # 메인 컨테이너
+    with st.container():
+        st.markdown('<div class="main-container">', unsafe_allow_html=True)
         
-        # Form으로 Enter 키와 버튼 클릭 모두 처리
-        with st.form(key="analyze_form", clear_on_submit=False):
-            # 입력 필드와 버튼을 한 줄에 배치
-            input_col, btn_col = st.columns([4, 1], gap="small")
-            
-            with input_col:
-                video_url = st.text_input(
-                    "URL",
-                    placeholder="Enter YouTube or Vimeo URL...",
-                    key="video_url_input",
-                    label_visibility="collapsed"
-                )
-            
-            with btn_col:
-                submitted = st.form_submit_button("Analyze", type="primary", use_container_width=True)
-            
-            if submitted and video_url:
-                st.session_state.video_url = video_url
-                st.session_state.show_input = False
-                st.session_state.analyzing = True
+        # 헤더
+        st.markdown('<h1 class="main-header">🎬 AI 영상 분석</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="sub-header">YouTube 또는 Vimeo 영상의 장르와 특성을 AI가 분석합니다</p>', unsafe_allow_html=True)
+        
+        # 입력 섹션
+        st.markdown('<div class="input-section">', unsafe_allow_html=True)
+        
+        # URL 입력
+        video_url = st.text_input(
+            "영상 URL을 입력하세요",
+            placeholder="https://www.youtube.com/watch?v=... 또는 https://vimeo.com/...",
+            help="YouTube와 Vimeo 영상을 지원합니다",
+            key="video_url_input"
+        )
+        
+        # 예시 URL 버튼
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📺 YouTube 예시", use_container_width=True):
+                st.session_state.example_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
                 st.rerun()
         
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_progress_ui():
-    """진행 상황 UI 렌더링"""
-    # 빈 공간으로 수직 중앙 정렬
-    for _ in range(12):
-        st.write("")
-    
-    # 중앙 정렬을 위한 컬럼
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        # 진행 상황 컨테이너
-        progress_container = st.empty()
+        with col2:
+            if st.button("🎬 Vimeo 예시", use_container_width=True):
+                st.session_state.example_url = "https://vimeo.com/347119375"
+                st.rerun()
         
-        # 실제 분석 함수 연결
-        try:
-            from handlers.video_handler import handle_video_analysis
-            from utils.constants import PRECISION_DESCRIPTIONS
-            
-            # 설정에서 정밀도 레벨 가져오기
-            precision_level = st.session_state.get('settings', {}).get('precision_level', 5)
-            
-            # 진행 상황 콜백
-            def progress_callback(step: str, progress: int, message: str):
-                with progress_container.container():
-                    st.markdown(f"""
-                    <div style="text-align: center;">
-                        <p class="progress-text fade-in">{message}</p>
-                        <div style="width: 100%; height: 4px; background-color: #27272A; border-radius: 2px; margin-top: 1rem;">
-                            <div style="width: {progress}%; height: 100%; background: linear-gradient(90deg, #8B5CF6 0%, #A78BFA 100%); border-radius: 2px; transition: width 0.3s ease;"></div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # 비디오 분석 실행
-            handle_video_analysis(st.session_state.video_url, precision_level, progress_callback)
-            
-            # 분석 완료
-            st.session_state.analyzing = False
-            st.session_state.analysis_complete = True
-            st.session_state.last_analysis_time = datetime.now().strftime("%H:%M")
-            st.rerun()
-            
-        except ImportError:
-            # 임시 시뮬레이션 (handler 연결 전)
-            progress_messages = [
-                ("parsing", 10, "🔍 Analyzing video URL..."),
-                ("download", 30, "📥 Downloading video..."),
-                ("extract", 50, "🎬 Extracting key scenes..."),
-                ("analyze", 80, "🤖 AI analysis in progress..."),
-                ("complete", 100, "💾 Saving results...")
-            ]
-            
-            for step, progress, message in progress_messages:
-                with progress_container.container():
-                    st.markdown(f"""
-                    <div style="text-align: center;">
-                        <p class="progress-text fade-in">{message}</p>
-                        <div style="width: 100%; height: 4px; background-color: #27272A; border-radius: 2px; margin-top: 1rem;">
-                            <div style="width: {progress}%; height: 100%; background: linear-gradient(90deg, #8B5CF6 0%, #A78BFA 100%); border-radius: 2px; transition: width 0.3s ease;"></div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                time.sleep(1)
-            
-            # 분석 완료
-            st.session_state.analyzing = False
-            st.session_state.analysis_complete = True
-            st.session_state.last_analysis_time = datetime.now().strftime("%H:%M")
-            st.rerun()
+        with col3:
+            if st.button("🎯 샘플 분석", use_container_width=True):
+                st.session_state.show_sample = True
+                st.rerun()
+        
+        # 예시 URL 적용
+        if 'example_url' in st.session_state:
+            video_url = st.session_state.example_url
+            del st.session_state.example_url
+        
+        # 정밀도 설정
+        st.markdown("### ⚙️ 분석 설정")
+        precision_level = st.slider(
+            "분석 정밀도",
+            min_value=1,
+            max_value=10,
+            value=5,
+            help="높을수록 더 정확하지만 시간이 오래 걸립니다"
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # input-section 닫기
+        
+        # 분석 버튼
+        if st.button("🚀 분석 시작", type="primary", use_container_width=True):
+            if video_url:
+                # 비디오 임베드 표시
+                embed_html = get_video_embed_html(video_url)
+                if embed_html:
+                    st.markdown('<div class="video-container">', unsafe_allow_html=True)
+                    st.markdown(embed_html, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 분석 진행
+                with st.spinner("영상을 분석하고 있습니다..."):
+                    try:
+                        # 실제 분석 수행
+                        video = handle_video_analysis(video_url, precision_level)
+                        
+                        if video:
+                            # 필름스트립 표시 (썸네일 + 씬 이미지들)
+                            st.markdown("### 🎞️ 추출된 씬")
+                            
+                            # 썸네일 경로 가져오기
+                            thumbnail_path = None
+                            if hasattr(video, 'metadata') and video.metadata:
+                                thumbnail_path = getattr(video.metadata, 'thumbnail', None)
+                            
+                            # 씬 리스트 가져오기
+                            scenes = getattr(video, 'scenes', [])
+                            
+                            filmstrip_html = create_filmstrip_html(scenes, thumbnail_path)
+                            st.markdown(filmstrip_html, unsafe_allow_html=True)
+                            
+                            # 분석 결과 표시
+                            display_analysis_results(video)
+                    except Exception as e:
+                        st.error(f"분석 중 오류가 발생했습니다: {str(e)}")
+            else:
+                st.error("❌ 영상 URL을 입력해주세요!")
+        
+        # 샘플 분석 결과 표시
+        if st.session_state.get('show_sample', False):
+            show_sample_analysis()
+            del st.session_state['show_sample']
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # main-container 닫기
 
 
-def render_results_ui():
-    """결과 UI 렌더링"""
-    # 상단 여백
-    st.write("")
+def display_analysis_results(video):
+    """분석 결과 표시"""
+    if not video or not hasattr(video, 'analysis_result') or not video.analysis_result:
+        st.warning("분석 결과가 없습니다.")
+        return
     
-    # 새 분석 버튼
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown("---")
+    st.markdown("### 📊 분석 결과")
+    
+    result = video.analysis_result
+    
+    # 주요 정보 메트릭
+    col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("← New Analysis", key="new_analysis"):
-            # 상태 초기화
-            st.session_state.analysis_complete = False
-            st.session_state.show_input = True
-            st.session_state.video_url = None
-            st.session_state.current_video = None
-            st.rerun()
-    
-    # 결과 표시
-    video = st.session_state.get('current_video')
-    
-    if video and hasattr(video, 'analysis_result') and video.analysis_result:
-        # 분석 결과가 있는 경우
-        render_analysis_results(video)
-    else:
-        # 임시 결과 (시뮬레이션)
-        render_temp_results()
-
-
-def render_analysis_results(video):
-    """실제 분석 결과 렌더링"""
-    st.markdown("### 📊 Analysis Results")
-    
-    # 메인 결과 카드
-    st.markdown(f"""
-    <div class="custom-card fade-in" style="margin-top: 2rem;">
-        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
-            <div>
-                <h2 style="color: #FAFAFA; margin: 0;">{video.metadata.title if video.metadata else 'Untitled'}</h2>
-                <p style="color: #71717A; margin-top: 0.5rem;">{video.metadata.uploader if video.metadata else 'Unknown'}</p>
-            </div>
-            <div style="text-align: right;">
-                <span class="tag" style="background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600;">
-                    {video.analysis_result.get('genre', 'Unknown')}
-                </span>
-            </div>
-        </div>
-        
-        <div style="border-top: 1px solid #27272A; padding-top: 1.5rem;">
-            <h3 style="color: #A78BFA; font-size: 1.125rem; margin-bottom: 1rem;">🎯 Analysis Summary</h3>
-            <p style="color: #E4E4E7; line-height: 1.6;">
-                {video.analysis_result.get('reasoning', 'No analysis available')}
-            </p>
-        </div>
-        
-        <div style="margin-top: 2rem;">
-            <h3 style="color: #A78BFA; font-size: 1.125rem; margin-bottom: 1rem;">✨ Key Features</h3>
-            <p style="color: #E4E4E7; line-height: 1.6;">
-                {video.analysis_result.get('features', 'No features detected')}
-            </p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 추가 정보 그리드
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="custom-card fade-in" style="margin-top: 1rem;">
-            <h4 style="color: #A78BFA; font-size: 1rem; margin-bottom: 0.5rem;">🎭 Mood & Tone</h4>
-            <p style="color: #E4E4E7;">{video.analysis_result.get('mood_tone', 'Not analyzed')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("장르", result.get('genre', 'N/A'))
     with col2:
-        st.markdown(f"""
-        <div class="custom-card fade-in" style="margin-top: 1rem;">
-            <h4 style="color: #A78BFA; font-size: 1rem; margin-bottom: 0.5rem;">🎯 Target Audience</h4>
-            <p style="color: #E4E4E7;">{video.analysis_result.get('target_audience', 'Not specified')}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("표현 형식", result.get('expression_style', 'N/A'))
+    with col3:
+        st.metric("분위기", result.get('mood_tone', 'N/A'))
+    
+    # 상세 분석 결과
+    analysis_sections = [
+        ("🎯", "장르 판단 이유", result.get('reasoning', '')),
+        ("✨", "영상의 특징", result.get('features', '')),
+        ("👥", "타겟 고객층", result.get('target_audience', ''))
+    ]
+    
+    for icon, title, content in analysis_sections:
+        if content:
+            st.markdown(f'''
+            <div class="analysis-card">
+                <div class="analysis-header">
+                    <div class="analysis-icon">{icon}</div>
+                    <div class="analysis-title">{title}</div>
+                </div>
+                <div class="analysis-content">{content}</div>
+            </div>
+            ''', unsafe_allow_html=True)
     
     # 태그 표시
-    if video.analysis_result.get('tags'):
-        st.markdown("""
-        <div class="custom-card fade-in" style="margin-top: 1rem;">
-            <h4 style="color: #A78BFA; font-size: 1rem; margin-bottom: 1rem;">🏷️ Tags</h4>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-        """, unsafe_allow_html=True)
-        
-        for tag in video.analysis_result['tags'][:10]:
-            st.markdown(f"""
-                <span style="background-color: #27272A; color: #A78BFA; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.875rem;">
-                    #{tag}
-                </span>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("</div></div>", unsafe_allow_html=True)
+    if result.get('tags'):
+        st.markdown("### 🏷️ 태그")
+        tags_html = '<div class="tag-container">'
+        for tag in result['tags']:
+            tags_html += f'<span class="tag">#{tag}</span>'
+        tags_html += '</div>'
+        st.markdown(tags_html, unsafe_allow_html=True)
 
 
-def render_temp_results():
-    """임시 결과 표시 (시뮬레이션)"""
-    st.markdown("### 📊 Analysis Results")
+def show_sample_analysis():
+    """샘플 분석 결과 표시"""
+    st.markdown("---")
+    st.markdown("### 📊 샘플 분석 결과")
     
-    st.markdown("""
-    <div class="custom-card fade-in" style="margin-top: 2rem;">
-        <h3 style="color: #A78BFA;">🎬 Video Analysis Complete</h3>
-        <p style="color: #71717A; margin-top: 1rem;">
-            Analysis results will appear here when connected to the actual processing system.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # 샘플 비디오 임베드
+    sample_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    sample_embed = get_video_embed_html(sample_url)
+    
+    if sample_embed:
+        st.markdown('<div class="video-container">', unsafe_allow_html=True)
+        st.markdown(sample_embed, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 샘플 필름스트립
+    st.markdown("### 🎞️ 추출된 씬")
+    sample_scenes = [
+        {'frame_path': '', 'timestamp': 0.0},
+        {'frame_path': '', 'timestamp': 15.5},
+        {'frame_path': '', 'timestamp': 30.2},
+        {'frame_path': '', 'timestamp': 45.8},
+        {'frame_path': '', 'timestamp': 60.0}
+    ]
+    filmstrip_html = create_filmstrip_html(sample_scenes, "thumbnail")
+    st.markdown(filmstrip_html, unsafe_allow_html=True)
+    
+    # 샘플 분석 결과
+    sample_result = get_sample_analysis_result()
+    
+    # 주요 정보 메트릭
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("장르", sample_result['genre'])
+    with col2:
+        st.metric("표현 형식", sample_result['expression_style'])
+    with col3:
+        st.metric("분위기", sample_result['mood_tone'])
+    
+    # 상세 분석 결과
+    analysis_sections = [
+        ("🎯", "장르 판단 이유", sample_result['reasoning']),
+        ("✨", "영상의 특징", sample_result['features']),
+        ("👥", "타겟 고객층", sample_result['target_audience'])
+    ]
+    
+    for icon, title, content in analysis_sections:
+        st.markdown(f'''
+        <div class="analysis-card">
+            <div class="analysis-header">
+                <div class="analysis-icon">{icon}</div>
+                <div class="analysis-title">{title}</div>
+            </div>
+            <div class="analysis-content">{content}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    # 태그 표시
+    st.markdown("### 🏷️ 태그")
+    tags_html = '<div class="tag-container">'
+    for tag in sample_result['tags']:
+        tags_html += f'<span class="tag">#{tag}</span>'
+    tags_html += '</div>'
+    st.markdown(tags_html, unsafe_allow_html=True)
+
+
+def get_sample_analysis_result():
+    """샘플 분석 결과 반환"""
+    return {
+        'genre': '코미디/엔터테인먼트',
+        'expression_style': '실사',
+        'mood_tone': '유쾌하고 활기찬',
+        'reasoning': '''이 영상은 전형적인 코미디/엔터테인먼트 장르의 특징을 보여줍니다. 
+        밝고 경쾌한 음악과 함께 리드미컬한 편집이 특징적이며, 
+        시청자들에게 즐거움과 재미를 전달하는 것을 주 목적으로 하고 있습니다.''',
+        'features': '''• 빠른 템포의 편집과 전환 효과
+        • 밝고 채도 높은 색감 사용
+        • 반복적인 리듬과 멜로디로 중독성 있는 구성
+        • 단순하지만 임팩트 있는 시각적 요소''',
+        'target_audience': '10대~30대의 젊은 층, 가벼운 엔터테인먼트를 즐기는 시청자',
+        'tags': ['코미디', '엔터테인먼트', '음악', '댄스', '바이럴', '유머', '팝컬처']
+    }
