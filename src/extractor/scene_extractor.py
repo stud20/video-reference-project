@@ -193,10 +193,13 @@ class SceneExtractor:
                 # 부족한 경우 시간적 분산으로 추가 추출 시도
                 self.logger.info(f"⚠️ 목표 {self.target_scene_count}개보다 적은 {len(scenes)}개 추출됨")
             
+            # 6. 그룹화된 씬들을 별도로 저장
+            scenes = self._save_grouped_scenes(scenes, session_id)
+            
             self.logger.info(f"✅ 최종 {len(scenes)}개 대표 씬 추출 완료 (정밀도 레벨: {self.precision_level})")
             
             return scenes
-            
+        
         except Exception as e:
             self.logger.error(f"씬 추출 중 오류 (정밀도 레벨 {self.precision_level}): {str(e)}")
             return []
@@ -390,6 +393,36 @@ class SceneExtractor:
         )
         
         return final_scenes
+
+    def _save_grouped_scenes(self, final_scenes: List[Scene], session_id: str) -> List[Scene]:
+        """그룹화된 씬들을 별도로 저장"""
+        grouped_dir = os.path.join(self.temp_dir, session_id, "grouped")
+        os.makedirs(grouped_dir, exist_ok=True)
+        
+        updated_scenes = []
+        for i, scene in enumerate(final_scenes):
+            # 원본 씬 이미지 경로
+            original_path = scene.frame_path
+            
+            # 그룹화된 씬 이미지 경로
+            grouped_filename = f"grouped_{i:04d}.jpg"
+            grouped_path = os.path.join(grouped_dir, grouped_filename)
+            
+            # 이미지 복사
+            try:
+                import shutil
+                shutil.copy2(original_path, grouped_path)
+                
+                # Scene 객체 업데이트 (grouped 경로 추가)
+                scene.grouped_path = grouped_path
+                updated_scenes.append(scene)
+                
+                self.logger.debug(f"그룹화된 씬 저장: {grouped_filename}")
+            except Exception as e:
+                self.logger.error(f"그룹화된 씬 복사 실패: {str(e)}")
+                updated_scenes.append(scene)
+    
+        return updated_scenes
     
     def _balance_scene_selection(self, cluster_reps: List[Scene], noise_scenes: List[Scene], all_scenes: List[Scene]) -> List[Scene]:
         """목표 개수에 맞춘 균형잡힌 씬 선택"""

@@ -20,8 +20,8 @@ class SFTPStorage:
         self.password = os.getenv("SYNOLOGY_PASS", "dav123")
         self.base_path = "/dav/videoRef"  # 시놀로지 실제 경로
         
-    def upload_file(self, local_path: str, remote_folder: str = "2025-session") -> str:
-        """SFTP로 파일 업로드"""
+    def upload_file(self, local_path: str, remote_path: str) -> str:
+        """SFTP로 파일 업로드 - 수정된 버전"""
         transport = None
         sftp = None
         
@@ -34,21 +34,26 @@ class SFTPStorage:
             # SFTP 클라이언트 생성
             sftp = paramiko.SFTPClient.from_transport(transport)
             
-            # 원격 경로 생성
-            remote_base = f"{self.base_path}/{remote_folder}"
+            # remote_path가 전체 경로인 경우 처리
+            if remote_path.startswith('video_analysis/'):
+                # base_path와 결합
+                full_remote_path = f"{self.base_path}/{remote_path}"
+            else:
+                full_remote_path = remote_path
+            
+            # 디렉토리와 파일명 분리
+            remote_dir = os.path.dirname(full_remote_path)
+            filename = os.path.basename(full_remote_path)
             
             # 디렉토리 생성 (재귀적)
-            self._mkdir_p(sftp, remote_base)
+            self._mkdir_p(sftp, remote_dir)
             
-            # 파일 업로드
-            filename = os.path.basename(local_path)
-            remote_path = f"{remote_base}/{filename}"
+            # 파일 업로드 (디렉토리가 아닌 파일 경로로)
+            self.logger.info(f"📤 업로드 시작: {local_path} -> {full_remote_path}")
+            sftp.put(local_path, full_remote_path)
             
-            self.logger.info(f"📤 업로드 시작: {local_path} -> {remote_path}")
-            sftp.put(local_path, remote_path)
-            
-            self.logger.info(f"✅ SFTP 업로드 완료: {remote_path}")
-            return remote_path
+            self.logger.info(f"✅ SFTP 업로드 완료: {full_remote_path}")
+            return full_remote_path
             
         except Exception as e:
             self.logger.error(f"❌ SFTP 업로드 실패: {e}")

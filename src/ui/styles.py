@@ -1,7 +1,7 @@
 # src/ui/styles.py
 
 def get_enhanced_styles() -> str:
-    """향상된 UI 스타일 - 콘솔 애니메이션 포함"""
+    """향상된 UI 스타일 - 깔끔한 버전"""
     return """
     <style>
         /* 다크 테마 기본 설정 */
@@ -20,35 +20,13 @@ def get_enhanced_styles() -> str:
             --console-border: #333333;
         }
         
-        /* 메인 헤더 스타일 */
-        .main-header {
-            text-align: center;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
-        }
-        
-        .main-header h1 {
-            color: white;
-            margin: 0;
-            font-size: 2.5rem;
-            font-weight: 700;
-        }
-        
-        .main-header p {
-            color: rgba(255, 255, 255, 0.9);
-            margin: 0.5rem 0 0 0;
-            font-size: 1.1rem;
-        }
-        
         /* 탭 스타일 개선 */
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
             background-color: var(--bg-secondary);
             border-radius: 10px;
             padding: 4px;
+            margin-top: 1rem;
         }
         
         .stTabs [data-baseweb="tab"] {
@@ -91,28 +69,12 @@ def get_enhanced_styles() -> str:
             }
         }
         
-        @keyframes typewriter {
-            from { width: 0; }
-            to { width: 100%; }
-        }
-        
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        
-        /* 분석 입력 필드 스타일 */
+        /* 분석 입력 필드 스타일 - 중앙 정렬 개선 */
         .analyze-input-container {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 400px;
+            min-height: 60vh;
             animation: fadeIn 0.5s ease-out;
         }
         
@@ -125,6 +87,11 @@ def get_enhanced_styles() -> str:
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             border: 1px solid var(--border-color);
             transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .analyze-input-wrapper h3 {
+            margin-bottom: 1rem;
         }
         
         .analyze-input-wrapper:hover {
@@ -202,22 +169,33 @@ def get_enhanced_styles() -> str:
             margin-right: 5px;
         }
         
-        /* 필름 스트립 스타일 */
+        /* 필름 스트립 컨테이너 개선 */
         .film-strip-container {
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin: 1rem 0;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
             animation: slideUp 0.5s ease-out;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
+        .film-strip-container h4 {
+            color: white;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        /* 필름 스트립 스크롤 영역 */
         .film-strip {
             display: flex;
-            gap: 15px;
+            gap: 20px;
             overflow-x: auto;
-            padding: 15px 5px;
+            padding: 20px 5px;
             scroll-behavior: smooth;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 1rem;
         }
         
         .film-strip::-webkit-scrollbar {
@@ -239,20 +217,6 @@ def get_enhanced_styles() -> str:
             background: #1565c0;
         }
         
-        .film-frame {
-            min-width: 180px;
-            height: 120px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 2px solid var(--border-color);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            background: var(--bg-card);
-            opacity: 0;
-            animation: filmFrameFadeIn 0.4s ease-out forwards;
-        }
-        
         @keyframes filmFrameFadeIn {
             from {
                 opacity: 0;
@@ -263,11 +227,48 @@ def get_enhanced_styles() -> str:
                 transform: scale(1) translateY(0);
             }
         }
+            
+        /* 필름 프레임 개선 */
+        .film-frame {
+            min-width: 200px;
+            height: 150px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 3px solid #333;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            background: #000;
+            opacity: 0;
+            animation: filmFrameFadeIn 0.4s ease-out forwards;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .film-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                to bottom,
+                transparent 0%,
+                transparent 70%,
+                rgba(0, 0, 0, 0.7) 100%
+            );
+            z-index: 1;
+            transition: opacity 0.3s ease;
+        }
+        
+        .film-frame:hover::before {
+            opacity: 0;
+        }
         
         .film-frame:hover {
             border-color: var(--primary-color);
-            transform: scale(1.05) translateY(-5px);
-            box-shadow: 0 8px 30px rgba(25, 118, 210, 0.4);
+            transform: scale(1.08) translateY(-8px);
+            box-shadow: 0 12px 40px rgba(25, 118, 210, 0.5);
             z-index: 10;
         }
         

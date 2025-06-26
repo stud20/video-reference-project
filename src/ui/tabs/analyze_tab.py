@@ -31,15 +31,17 @@ def render_analyze_tab():
         render_results_section()
 
 
+# src/ui/tabs/analyze_tab.py의 render_input_section 함수 수정
+
 def render_input_section():
-    """URL 입력 섹션 - 애니메이션 효과 포함"""
+    """URL 입력 섹션 - 깔끔한 버전"""
     # 컨테이너 ID 설정 (애니메이션용)
-    container_id = "input-container"
+  #  container_id = "input-container"
     
-    st.markdown(f"""
-    <div id="{container_id}" class="analyze-input-container">
-        <div class="analyze-input-wrapper">
-    """, unsafe_allow_html=True)
+    #st.markdown(f"""
+   # <div id="{container_id}" class="analyze-input-container">
+   #     <div class="analyze-input-wrapper">
+    #""", unsafe_allow_html=True)
     
     # 타이틀
     st.markdown("### 🎬 영상 분석 시작하기")
@@ -68,21 +70,6 @@ def render_input_section():
     if st.session_state.get('enter_pressed'):
         analyze_button = True
         st.session_state.enter_pressed = False
-    
-    # 예시 링크
-    st.markdown("---")
-    st.markdown("#### 💡 예시 링크")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📺 YouTube 예시", use_container_width=True):
-            st.session_state.analyze_url_input = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-            st.rerun()
-    
-    with col2:
-        if st.button("🎬 Vimeo 예시", use_container_width=True):
-            st.session_state.analyze_url_input = "https://vimeo.com/347119375"
-            st.rerun()
     
     st.markdown("</div></div>", unsafe_allow_html=True)
     
@@ -138,103 +125,80 @@ def render_input_section():
     elif analyze_button:
         st.error("URL을 입력해주세요!")
 
-
 def render_processing_section():
-    """처리 중 섹션 - 실시간 콘솔 출력"""
+    """처리 중 섹션 - 실시간 콘솔 출력 (Streamlit native 방식)"""
     video_url = st.session_state.get('current_video_url')
-    
-    # 비디오 임베드 (슬라이드업 + 페이드인 애니메이션)
-    st.markdown("""
-    <div style="animation: slideDown 0.5s ease-out, fadeIn 0.5s ease-out;">
-    """, unsafe_allow_html=True)
-    
+    if not video_url:
+        st.error("비디오 URL이 존재하지 않습니다.")
+        return
+
+    # 비디오 임베드
     render_video_embed(video_url)
+
+    # 콘솔창 컨테이너 생성
+    st.markdown("### 💻 처리 상황")
+    console_container = st.container()
     
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 3줄 콘솔 창
-    st.markdown("""
-    <div class="console-window" id="console-window">
-        <div id="console-content"></div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 콘솔 메시지를 실시간으로 업데이트하는 placeholder
-    console_placeholder = st.empty()
-    
-    # JavaScript for console updates
-    st.markdown("""
-    <script>
-        window.updateConsole = function(message) {
-            const consoleContent = document.getElementById('console-content');
-            if (consoleContent) {
-                // 새 라인 추가
-                const line = document.createElement('div');
-                line.className = 'console-line';
-                line.textContent = '> ' + message;
-                consoleContent.appendChild(line);
-                
-                // 3줄만 유지
-                while (consoleContent.children.length > 3) {
-                    consoleContent.removeChild(consoleContent.firstChild);
-                }
-                
-                // 스크롤을 아래로
-                const consoleWindow = document.getElementById('console-window');
-                consoleWindow.scrollTop = consoleWindow.scrollHeight;
-            }
-        }
-    </script>
-    """, unsafe_allow_html=True)
-    
-    # 분석 프로세스 시작
-    try:
-        # 정밀도 레벨 가져오기
-        precision_level = st.session_state.get('precision_level', 5)
+    # 콘솔 스타일 적용
+    with console_container:
+        console_placeholder = st.empty()
         
-        # 콘솔 업데이트 함수
-        def update_console(message):
-            # JavaScript 특수문자 이스케이프
-            escaped_message = message.replace("'", "\\'").replace('"', '\\"')
-            console_placeholder.markdown(
-                f"<script>updateConsole('{escaped_message}');</script>",
-                unsafe_allow_html=True
-            )
+    # 로그 라인 저장용 (세션 상태에 저장)
+    if 'console_logs' not in st.session_state:
+        st.session_state.console_logs = []
+    
+    def update_console(message: str):
+        """콘솔 라인 업데이트 함수 - 최대 3줄 유지"""
+        st.session_state.console_logs.append(f"> {message}")
+        if len(st.session_state.console_logs) > 3:
+            st.session_state.console_logs.pop(0)
         
-        # 분석 실행
-        video = handle_video_analysis_enhanced(
-            video_url, 
-            precision_level,
-            update_console
+        # 콘솔 스타일로 표시
+        console_text = "\n".join(st.session_state.console_logs)
+        console_placeholder.markdown(
+            f"""
+            <div style="
+                background-color: #1e1e1e;
+                color: #00ff00;
+                padding: 15px;
+                border-radius: 5px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 14px;
+                height: 100px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+            ">
+{console_text}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
+
+    try:
+        # 콘솔 초기화
+        st.session_state.console_logs = []
         
-        # 콘솔 창 숨기기 애니메이션
-        st.markdown("""
-        <script>
-            setTimeout(() => {
-                const console = document.getElementById('console-window');
-                if (console) {
-                    console.style.animation = 'fadeOut 0.3s ease-out forwards';
-                    setTimeout(() => {
-                        console.style.display = 'none';
-                    }, 300);
-                }
-            }, 500);
-        </script>
-        """, unsafe_allow_html=True)
-        
-        time.sleep(0.8)  # 애니메이션 대기
-        
-        # 결과 저장
+        # 정밀도 레벨
+        precision_level = st.session_state.get('precision_level', 5)
+
+        # 실제 분석 실행
+        video = handle_video_analysis_enhanced(
+            video_url=video_url,
+            precision_level=precision_level,
+            console_callback=update_console
+        )
+
+        # 분석 완료 후 상태 전환
         st.session_state.analysis_result = video
+        st.session_state.console_logs = []  # 콘솔 로그 초기화
         set_analysis_state('completed')
         st.rerun()
-        
+
     except Exception as e:
         st.error(f"분석 중 오류 발생: {str(e)}")
+        st.session_state.console_logs = []  # 오류 시에도 초기화
         set_analysis_state('idle')
         st.rerun()
-
 
 def render_results_section():
     """결과 표시 섹션"""
@@ -300,8 +264,27 @@ def render_film_strip(video):
     
     num_scenes = len(video.scenes)
     
-    # 썸네일 포함 여부 확인
-    has_thumbnail = hasattr(video, 'thumbnail_path') and video.thumbnail_path
+    # 썸네일 포함 여부 확인 - 수정된 부분
+    has_thumbnail = False
+    thumbnail_path = None
+    
+    # 썸네일 경로 찾기
+    if video.metadata and video.metadata.thumbnail:
+        # 로컬 파일인지 확인
+        if os.path.exists(video.metadata.thumbnail):
+            has_thumbnail = True
+            thumbnail_path = video.metadata.thumbnail
+        else:
+            # session_dir에서 썸네일 찾기
+            if hasattr(video, 'session_dir') and video.session_dir:
+                possible_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+                for ext in possible_extensions:
+                    test_path = os.path.join(video.session_dir, f"thumbnail{ext}")
+                    if os.path.exists(test_path):
+                        has_thumbnail = True
+                        thumbnail_path = test_path
+                        break
+    
     total_images = num_scenes + (1 if has_thumbnail else 0)
     
     st.markdown(f'<p style="color: var(--text-secondary); font-size: 0.9rem;">총 {total_images}개 이미지 (정밀도 레벨: {st.session_state.get("precision_level", 5)})</p>', unsafe_allow_html=True)
@@ -313,8 +296,8 @@ def render_film_strip(video):
         html_content = ""
         
         # 썸네일 먼저 표시
-        if has_thumbnail:
-            html_content += render_film_frame(video.thumbnail_path, "썸네일", 0)
+        if has_thumbnail and thumbnail_path:
+            html_content += render_film_frame(thumbnail_path, "썸네일", 0)
         
         # 씬 이미지들
         for i, scene in enumerate(video.scenes):
@@ -334,9 +317,9 @@ def render_film_strip(video):
         col_idx = 0
         
         # 썸네일 표시
-        if has_thumbnail:
+        if has_thumbnail and thumbnail_path:
             with cols[col_idx % len(cols)]:
-                st.image(video.thumbnail_path, caption="📌 썸네일", use_container_width=True)
+                st.image(thumbnail_path, caption="📌 썸네일", use_container_width=True)
             col_idx += 1
         
         # 씬 이미지들
@@ -365,54 +348,192 @@ def render_film_frame(image_path: str, caption: str, index: int) -> str:
     </div>
     """
 
-
 def render_analysis_results(video):
-    """분석 결과 표시"""
+    """분석 결과 표시 - 2컬럼 레이아웃 (개선된 버전)"""
     if not video.analysis_result:
         return
     
-    st.markdown('<div class="result-section">', unsafe_allow_html=True)
     st.markdown("### 📊 분석 결과")
     
+    # 스타일 정의
+    st.markdown("""
+    <style>
+        .analysis-wrapper {
+            display: grid;
+            grid-template-columns: 35% 65%;
+            gap: 2px;
+            margin-top: 20px;
+        }
+        
+        .column-left {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .column-right {
+            background-color: #1e2936;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .result-row {
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .result-row:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        
+        .result-content {
+            color: #e0e0e0;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+        
+        .tag-chip {
+            display: inline-block;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            padding: 4px 12px;
+            margin: 2px;
+            border-radius: 16px;
+            font-size: 0.85rem;
+        }
+        
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .info-list li {
+            margin: 5px 0;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 데이터 준비
     result = video.analysis_result
+    metadata = video.metadata if video.metadata else None
     
-    # 결과 아이템들
-    items = [
-        ("🎭 장르", result.get('genre', 'Unknown')),
-        ("🎨 표현형식", result.get('expression_style', 'Unknown')),
-        ("💡 판단이유", result.get('reasoning', 'Unknown')),
-        ("✨ 특징", result.get('features', 'Unknown')),
-        ("🌈 분위기", result.get('mood_tone', 'Unknown')),
-        ("👥 타겟 고객층", result.get('target_audience', 'Unknown'))
-    ]
+    # Streamlit columns 사용
+    col1, col2 = st.columns([35, 65])
     
-    for label, value in items:
-        st.markdown(f"""
-        <div class="result-item">
-            <div class="result-label">{label}</div>
-            <div class="result-value">{value}</div>
+    # 왼쪽 컬럼 - 메타데이터
+    with col1:
+        st.markdown('<div class="column-left">', unsafe_allow_html=True)
+        
+        # 제목
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">📹 제목</div>
+            <div class="result-content">{metadata.title if metadata else 'Unknown'}</div>
         </div>
-        """, unsafe_allow_html=True)
-    
-    # 태그
-    tags = result.get('tags', [])
-    if tags:
-        st.markdown("""
-        <div class="result-item">
-            <div class="result-label">🏷️ 태그</div>
-            <div class="result-value">
-                <div class="tag-container">
-        """, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
         
-        for i, tag in enumerate(tags[:20]):  # 최대 20개
-            st.markdown(
-                f'<span class="tag" style="animation-delay: {i * 0.05}s;">#{tag}</span>', 
-                unsafe_allow_html=True
-            )
+        # 업로드 채널
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">👤 업로드 채널</div>
+            <div class="result-content">{metadata.uploader if metadata else 'Unknown'}</div>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        st.markdown("</div></div></div>", unsafe_allow_html=True)
+        # 설명
+        description = metadata.description[:200] + '...' if metadata and metadata.description and len(metadata.description) > 200 else (metadata.description if metadata else '')
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">📝 설명</div>
+            <div class="result-content">{description}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # 기타 정보
+        meta_info_html = '<ul class="info-list">'
+        if metadata:
+            if metadata.view_count:
+                meta_info_html += f'<li>👁️ 조회수: {metadata.view_count:,}회</li>'
+            if metadata.duration:
+                meta_info_html += f'<li>⏱️ 길이: {int(metadata.duration//60)}분 {int(metadata.duration%60)}초</li>'
+            if metadata.upload_date:
+                meta_info_html += f'<li>📅 업로드: {metadata.upload_date[:10] if len(metadata.upload_date) >= 10 else metadata.upload_date}</li>'
+            if metadata.like_count:
+                meta_info_html += f'<li>👍 좋아요: {metadata.like_count:,}</li>'
+            if metadata.comment_count:
+                meta_info_html += f'<li>💬 댓글: {metadata.comment_count:,}</li>'
+        meta_info_html += '</ul>'
+        
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">📊 기타 정보</div>
+            <div class="result-content">{meta_info_html}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 오른쪽 컬럼 - AI 분석 결과
+    with col2:
+        st.markdown('<div class="column-right">', unsafe_allow_html=True)
+        
+        # 장르 & 표현형식
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">🎭 장르 & 🎨 표현형식</div>
+            <div class="result-content">{result.get('genre', 'Unknown')} • {result.get('expression_style', 'Unknown')}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # 판단이유
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">💡 판단이유</div>
+            <div class="result-content">{result.get('reasoning', 'Unknown')}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # 특징
+        st.markdown(f'''
+        <div class="result-row">
+            <div class="result-label">✨ 특징</div>
+            <div class="result-content">{result.get('features', 'Unknown')}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # 분위기, 타겟, 태그를 하나의 row로
+        tags_html = ""
+        tags = result.get('tags', [])
+        if tags:
+            for tag in tags[:20]:
+                tags_html += f'<span class="tag-chip">#{tag}</span>'
+        
+        st.markdown(f'''
+        <div class="result-row">
+            <div style="margin-bottom: 15px;">
+                <div class="result-label">🌈 분위기</div>
+                <div class="result-content">{result.get('mood_tone', 'Unknown')}</div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <div class="result-label">👥 타겟 고객층</div>
+                <div class="result-content">{result.get('target_audience', 'Unknown')}</div>
+            </div>
+            <div>
+                <div class="result-label">🏷️ 태그</div>
+                <div class="result-content">{tags_html}</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_action_buttons(video):
@@ -466,6 +587,8 @@ def render_modals():
         render_save_modal()
 
 
+# src/ui/tabs/analyze_tab.py에서 render_moodboard_modal 함수 수정
+
 def render_moodboard_modal():
     """무드보드 모달"""
     st.markdown("""
@@ -492,9 +615,14 @@ def render_moodboard_modal():
         cols = st.columns(4)
         for i, scene in enumerate(video.scenes):
             with cols[i % 4]:
-                # 체크박스와 이미지
+                # 체크박스와 이미지 - 레이블 추가하고 숨김
                 is_selected = i in selected_images
-                if st.checkbox("", value=is_selected, key=f"mood_img_{i}"):
+                if st.checkbox(
+                    f"이미지 {i+1} 선택",  # 레이블 추가
+                    value=is_selected, 
+                    key=f"mood_img_{i}",
+                    label_visibility="collapsed"  # 레이블 숨김
+                ):
                     if i not in selected_images:
                         selected_images.append(i)
                 else:

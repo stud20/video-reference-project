@@ -500,44 +500,105 @@ class VideoService:
             video: 업로드할 Video 객체
         """
         try:
-            # 업로드할 파일 목록 생성
-            files_to_upload = []
-            
-            # 비디오 파일
-            if video.local_path and os.path.exists(video.local_path):
-                files_to_upload.append(video.local_path)
-            
-            # 씬 이미지들
-            for scene in video.scenes:
-                if scene.frame_path and os.path.exists(scene.frame_path):
-                    files_to_upload.append(scene.frame_path)
-            
-            # 분석 결과 JSON
-            if video.analysis_result:
-                analysis_path = f"data/temp/{video.session_id}/analysis_result.json"
-                os.makedirs(os.path.dirname(analysis_path), exist_ok=True)
-                
-                import json
-                with open(analysis_path, 'w', encoding='utf-8') as f:
-                    json.dump(video.analysis_result, f, ensure_ascii=False, indent=2)
-                files_to_upload.append(analysis_path)
-            
-            # 스토리지에 업로드
+            # 원격 기본 경로 설정
             remote_base_path = f"video_analysis/{video.session_id}"
             
-            for file_path in files_to_upload:
-                filename = os.path.basename(file_path)
-                safe_filename = filename.replace('*', '_').replace('/', '_')
-                remote_path = f"{remote_base_path}/{safe_filename}"
+            # 1. 비디오 파일 업로드
+            if video.local_path and os.path.exists(video.local_path):
+                # 비디오 파일명 가져오기
+                video_filename = os.path.basename(video.local_path)
+                remote_video_path = os.path.join(remote_base_path, video_filename)
                 
-                success = self.storage_manager.upload_file(file_path, remote_path)
+                success = self.storage_manager.upload_file(video.local_path, remote_video_path)
                 if success:
-                    logger.info(f"업로드 완료: {filename} -> {remote_path}")
+                    logger.info(f"✅ 비디오 업로드 완료: {video_filename}")
                 else:
-                    logger.warning(f"업로드 실패: {filename}")
+                    logger.warning(f"❌ 비디오 업로드 실패: {video_filename}")
+            
+            # 2. 썸네일 업로드
+            thumbnail_path = None
+            if video.metadata and video.metadata.thumbnail:
+                # 로컬 썸네일 파일 찾기
+                session_dir = os.path.dirname(video.local_path) if video.local_path else f"data/temp/{video.session_id}"
+                possible_thumbnail = os.path.join(session_dir, f"{video.session_id}_Thumbnail.jpg")
+                
+                if os.path.exists(possible_thumbnail):
+                    thumbnail_path = possible_thumbnail
+                else:
+                    # 다른 형식의 썸네일 찾기
+                    for ext in ['.jpg', '.jpeg', '.png', '.webp']:
+                        test_path = os.path.join(session_dir, f"thumbnail{ext}")
+                        if os.path.exists(test_path):
+                            thumbnail_path = test_path
+                            break
+            
+            if thumbnail_path:
+                thumbnail_filename = f"{video.session_id}_Thumbnail.jpg"
+                remote_thumbnail_path = os.path.join(remote_base_path, thumbnail_filename)
+                
+                success = self.storage_manager.upload_file(thumbnail_path, remote_thumbnail_path)
+                if success:
+                    logger.info(f"✅ 썸네일 업로드 완료: {thumbnail_filename}")
+                else:
+                    logger.warning(f"❌ 썸네일 업로드 실패: {thumbnail_filename}")
+            
+            # 3. 모든 씬 이미지 업로드 (scene_XXXX.jpg)
+            scenes_dir = os.path.join(session_dir, "scenes")
+            if os.path.exists(scenes_dir):
+                scene_files = sorted([f for f in os.listdir(scenes_dir) if f.startswith('scene_') and f.endswith('.jpg')])
+                
+                for scene_file in scene_files:
+                    scene_path = os.path.join(scenes_dir, scene_file)
+                    remote_scene_path = os.path.join(remote_base_path, scene_file)
                     
+                    success = self.storage_manager.upload_file(scene_path, remote_scene_path)
+                    if success:
+                        logger.debug(f"✅ 씬 업로드: {scene_file}")
+                    else:
+                        logger.warning(f"❌ 씬 업로드 실패: {scene_file}")
+                
+                logger.info(f"📸 총 {len(scene_files)}개 씬 이미지 업로드 완료")
+            
+            # 4. 그룹화된 씬 이미지 업로드 (grouped_XXXX.jpg)
+            grouped_count = 0
+            for scene in video.scenes:
+                if hasattr(scene, 'grouped_path') and scene.grouped_path and os.path.exists(scene.grouped_path):
+                    grouped_filename = os.path.basename(scene.grouped_path)
+                    remote_grouped_path = os.path.join(remote_base_path, grouped_filename)
+                    
+                    success = self.storage_manager.upload_file(scene.grouped_path, remote_grouped_path)
+                    if success:
+                        grouped_count += 1
+                        logger.debug(f"✅ 그룹화된 씬 업로드: {grouped_filename}")
+                    else:
+                        logger.warning(f"❌ 그룹화된 씬 업로드 실패: {grouped_filename}")
+            
+            logger.info(f"🔍 총 {grouped_count}개 그룹화된 씬 업로드 완료")
+            
+            # 5. 분석 결과 JSON 업로드
+            if video.analysis_result:
+                analysis_path = os.path.join(session_dir, "analysis_result.json")
+                
+                # 파일이 없으면 생성
+                if not os.path.exists(analysis_path):
+                    os.makedirs(os.path.dirname(analysis_path), exist_ok=True)
+                    
+                    import json
+                    with open(analysis_path, 'w', encoding='utf-8') as f:
+                        json.dump(video.analysis_result, f, ensure_ascii=False, indent=2)
+                
+                remote_analysis_path = os.path.join(remote_base_path, "analysis_result.json")
+                
+                success = self.storage_manager.upload_file(analysis_path, remote_analysis_path)
+                if success:
+                    logger.info(f"✅ 분석 결과 업로드 완료")
+                else:
+                    logger.warning(f"❌ 분석 결과 업로드 실패")
+            
         except Exception as e:
             logger.error(f"스토리지 업로드 중 오류: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     def _cleanup_temp_files(self, video: Video) -> None:
         """

@@ -1,6 +1,6 @@
 # app.py
 """
-AI 기반 광고 영상 콘텐츠 추론 시스템 - 개선된 UI
+AI 기반 광고 영상 콘텐츠 추론 시스템 - 깔끔한 UI
 """
 
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ def setup_page():
         page_title="AI 영상 레퍼런스 분석기",
         page_icon="🎥",
         layout="wide",
-        initial_sidebar_state="collapsed"  # 사이드바 숨김
+        initial_sidebar_state="collapsed"
     )
     
     # 향상된 CSS 스타일 적용
@@ -45,26 +45,12 @@ def setup_page():
     init_session_state()
 
 
-def render_header():
-    """헤더 렌더링"""
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        st.markdown("""
-        <div class="main-header">
-            <h1>🎬 AI Video Reference Analyzer</h1>
-            <p>영상 콘텐츠 자동 분석 및 분류 시스템</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-
 def main():
     """메인 앱 함수"""
     # 페이지 설정
     setup_page()
     
-    # 헤더
-    render_header()
-    
+    # 헤더 제거하고 바로 탭으로 시작
     # 탭 생성
     tab1, tab2, tab3 = st.tabs(["🎯 Analyze", "📊 Database", "⚙️ Settings"])
     

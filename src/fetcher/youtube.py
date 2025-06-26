@@ -71,7 +71,8 @@ class YouTubeDownloader:
             
             # 3. 파일명 생성
             safe_title = self._sanitize_filename(video_title)
-            output_template = os.path.join(output_dir, f'{safe_title}.%(ext)s')
+            # 비디오 파일명을 {video_id}_제목.mp4 형식으로 변경
+            output_template = os.path.join(output_dir, f'{video_id}_{safe_title}.%(ext)s')
             
             # 4. 다운로드 옵션 설정 (macOS 호환 H.264 우선)
             quality_option = os.getenv("VIDEO_QUALITY", "best")
@@ -116,8 +117,8 @@ class YouTubeDownloader:
             # 8. 자막 파일 찾기
             subtitle_files = self._find_subtitle_files(output_dir)
             
-            # 9. 썸네일 파일 찾기
-            thumbnail_file = self._find_thumbnail_file(output_dir)
+            # 9. 썸네일 파일 처리
+            thumbnail_file = self._download_and_save_thumbnail(info, output_dir, video_id)
             
             # 10. 결과 반환 (확장된 메타데이터)
             result = {
@@ -137,8 +138,8 @@ class YouTubeDownloader:
                 'language': info.get('language', ''),
                 'age_limit': info.get('age_limit', 0),
                 'ext': os.path.splitext(processed_file)[1][1:],
-                'thumbnail': info.get('thumbnail', ''),  # 항상 URL을 사용
-                'thumbnail_file': thumbnail_file,  # 로컬 파일은 별도로
+                'thumbnail': info.get('thumbnail', ''),  # 원본 URL
+                'thumbnail_file': thumbnail_file,  # 로컬 파일 경로
                 'webpage_url': info.get('webpage_url', url),
                 'subtitle_files': subtitle_files,
                 'platform': self._detect_platform(url),
@@ -163,6 +164,41 @@ class YouTubeDownloader:
             self.logger.error(f"다운로드 실패: {str(e)}")
             raise
     
+    def _download_and_save_thumbnail(self, info: Dict[str, Any], output_dir: str, video_id: str) -> Optional[str]:
+        """썸네일 다운로드 및 저장"""
+        thumbnail_url = info.get('thumbnail', '')
+        if not thumbnail_url:
+            return None
+            
+        try:
+            # 썸네일 파일 경로 설정
+            thumbnail_path = os.path.join(output_dir, f'{video_id}_Thumbnail.jpg')
+            
+            # yt-dlp를 사용하여 썸네일 다운로드
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'outtmpl': thumbnail_path,
+                'writethumbnail': True,
+                'skip_download': True,
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # 썸네일만 다운로드
+                import urllib.request
+                urllib.request.urlretrieve(thumbnail_url, thumbnail_path)
+                
+            if os.path.exists(thumbnail_path):
+                self.logger.info(f"✅ 썸네일 저장: {thumbnail_path}")
+                return thumbnail_path
+            else:
+                self.logger.warning("썸네일 다운로드 실패")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"썸네일 다운로드 중 오류: {str(e)}")
+            return None
+    
     def _find_subtitle_files(self, directory: str) -> Dict[str, str]:
         """자막 파일 찾기"""
         subtitle_files = {}
@@ -181,9 +217,9 @@ class YouTubeDownloader:
         return subtitle_files
     
     def _find_thumbnail_file(self, directory: str) -> Optional[str]:
-        """썸네일 파일 찾기"""
+        """썸네일 파일 찾기 (레거시 지원용)"""
         for file in os.listdir(directory):
-            if file.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+            if file.endswith(('.jpg', '.jpeg', '.png', '.webp')) and 'Thumbnail' in file:
                 return os.path.join(directory, file)
         return None
     

@@ -45,17 +45,18 @@ class StorageManager:
             from src.storage.local_storage import LocalStorage
             return LocalStorage()
     
-    def upload_file(self, local_path: str, remote_folder: str = None) -> str:
+    def upload_file(self, local_path: str, remote_path: str) -> str:
         """파일 업로드 (스토리지 타입에 관계없이 동일한 인터페이스)"""
         try:
-            return self.storage.upload_file(local_path, remote_folder)
+            # remote_path를 그대로 전달 (각 스토리지 구현체에서 처리)
+            return self.storage.upload_file(local_path, remote_path)
         except Exception as e:
             self.logger.error(f"업로드 실패: {e}")
             # 실패 시 로컬 저장으로 폴백
             self.logger.info("로컬 저장으로 대체 시도")
             from src.storage.local_storage import LocalStorage
             local_storage = LocalStorage()
-            return local_storage.upload_file(local_path, remote_folder)
+            return local_storage.upload_file(local_path, remote_path)
     
     def test_connection(self) -> bool:
         """연결 테스트"""

@@ -61,6 +61,7 @@ class Scene:
     frame_path: str
     scene_type: str = "mid"  # "start", "mid", "end"
     confidence: float = 0.0  # 씬 전환 신뢰도
+    grouped_path: Optional[str] = None  # 그룹화된 씬 경로 추가
     
     def to_dict(self) -> Dict[str, Any]:
         """딕셔너리로 변환"""
@@ -68,7 +69,8 @@ class Scene:
             'timestamp': self.timestamp,
             'frame_path': self.frame_path,
             'scene_type': self.scene_type,
-            'confidence': self.confidence
+            'confidence': self.confidence,
+            'grouped_path': self.grouped_path
         }
 
 
