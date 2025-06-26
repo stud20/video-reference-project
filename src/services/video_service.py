@@ -199,8 +199,17 @@ class VideoService:
             # session_dir 속성 추가
             video.session_dir = os.path.dirname(download_result['filepath'])
             
-            # 5. DB에 영상 정보 저장
+            # 5. DB에 영상 정보 저장 부분을 다음과 같이 수정
             update_progress("database", 45, "💾 데이터베이스에 정보 저장 중...")
+
+            # 씬 정보 준비 (향후 사용을 위해)
+            scenes_data = []
+            for scene in video.scenes:
+                scenes_data.append({
+                    'timestamp': scene.timestamp,
+                    'frame_path': os.path.basename(scene.frame_path),
+                    'scene_type': scene.scene_type
+                })
 
             # 확장된 메타데이터를 모두 포함하여 저장
             video_data = {
@@ -226,6 +235,9 @@ class VideoService:
                 'age_limit': video.metadata.age_limit,
                 'thumbnail': video.metadata.thumbnail,
                 'webpage_url': video.metadata.webpage_url,
+                
+                # 씬 정보 추가 (향후 사용을 위해)
+                'scenes': scenes_data
             }
 
             self.db.save_video_info(video_data)
@@ -473,6 +485,47 @@ class VideoService:
                     platform=video_info.get('platform', 'youtube')
                 )
             )
+            
+            # 씬 정보 복원
+            video.scenes = []
+            
+            # 방법 1: video_info에 씬 정보가 있는 경우 (future-proof)
+            if 'scenes' in video_info:
+                scenes_data = video_info['scenes']
+                for scene_data in scenes_data:
+                    scene = Scene(
+                        timestamp=scene_data.get('timestamp', 0.0),
+                        frame_path=scene_data.get('frame_path', ''),
+                        scene_type=scene_data.get('scene_type', 'mid')
+                    )
+                    video.scenes.append(scene)
+                logger.info(f"DB에서 {len(video.scenes)}개 씬 정보 복원")
+            
+            # 방법 2: 분석 데이터의 analyzed_scenes에서 복원
+            elif 'analyzed_scenes' in analysis_data:
+                analyzed_scenes = analysis_data['analyzed_scenes']
+                for i, scene_filename in enumerate(analyzed_scenes):
+                    # 씬 파일명에서 타임스탬프 추출 시도
+                    # scene_0001.jpg 형식에서 숫자 추출
+                    import re
+                    match = re.search(r'scene_(\d+)', scene_filename)
+                    if match:
+                        scene_index = int(match.group(1))
+                        # 대략적인 타임스탬프 추정 (10초 간격 가정)
+                        estimated_timestamp = scene_index * 10.0
+                    else:
+                        estimated_timestamp = i * 10.0
+                    
+                    scene = Scene(
+                        timestamp=estimated_timestamp,
+                        frame_path=scene_filename,
+                        scene_type='mid'
+                    )
+                    video.scenes.append(scene)
+                logger.info(f"analyzed_scenes에서 {len(video.scenes)}개 씬 정보 복원")
+            
+            # session_dir 설정 (이미지 URL 구성에 필요)
+            video.session_dir = f"data/temp/{video_id}"
             
             # 분석 결과 매핑
             video.analysis_result = {
