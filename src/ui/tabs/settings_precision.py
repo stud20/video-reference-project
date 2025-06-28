@@ -4,17 +4,17 @@
 """
 
 import streamlit as st
+import os
 from utils.constants import PRECISION_DESCRIPTIONS, TIME_ESTIMATES
 from utils.env_manager import EnvManager
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
+# src/ui/tabs/settings_precision.py 일부
 def render_precision_settings():
     """분석 정밀도 설정 렌더링"""
     st.subheader("🎯 분석 정밀도 설정")
-    st.markdown("영상에서 추출된 씬들을 그룹화하는 정밀도를 설정합니다. 높은 레벨일수록 더 정교한 분석이 가능하지만 처리 시간이 늘어납니다.")
     
     # 현재 정밀도 레벨
     current_precision = EnvManager.get_int("SCENE_PRECISION_LEVEL", 5)
@@ -36,13 +36,17 @@ def render_precision_settings():
         if new_precision != current_precision:
             st.caption(f"→ {new_precision}")
     
-    # 레벨 변경 시 환경변수와 .env 파일 업데이트
+    # 레벨 변경 시 즉시 환경변수 업데이트
     if new_precision != current_precision:
-        if EnvManager.update("SCENE_PRECISION_LEVEL", new_precision, f"(레벨 {current_precision} → {new_precision})"):
+        # 환경변수 즉시 업데이트
+        os.environ["SCENE_PRECISION_LEVEL"] = str(new_precision)
+        
+        # .env 파일에도 저장
+        if EnvManager.update("SCENE_PRECISION_LEVEL", new_precision):
             st.success(f"✅ 정밀도 레벨이 {current_precision}에서 {new_precision}로 변경되었습니다")
-            st.info("💾 설정이 .env 파일에 저장되었습니다")
-        else:
-            st.error("❌ 설정 저장 중 오류가 발생했습니다")
+            
+            # 세션 상태에도 저장 (옵션)
+            st.session_state['scene_precision_level'] = new_precision
     
     # 정밀도 레벨 상세 정보
     st.markdown("---")

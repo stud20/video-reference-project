@@ -161,7 +161,7 @@ def render_film_strip(video):
         st.image(thumbnail_url, caption=caption, use_container_width=True)
     
     # 씬 이미지들
-    for i, scene in enumerate(video.scenes):
+    for i, scene in enumerate(video.grouped_scenes):
         scene_filename = os.path.basename(scene.frame_path)
         scene_url = f"{base_url}/{video.session_id}/{scene_filename}"
         

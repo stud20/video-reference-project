@@ -23,25 +23,20 @@ def render_settings_tab():
     st.header("⚙️ 시스템 설정")
     
     # 탭 생성
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🎯 분석 정밀도",
+    tab1, tab2, tab3 = st.tabs([
         "🗑️ 캐시 관리", 
         "🤖 AI 프롬프트",
         "📝 Notion 연동"
     ])
     
-    # 분석 정밀도 설정
-    with tab1:
-        render_precision_settings()
-    
     # 캐시 관리
-    with tab2:
+    with tab1:
         render_cache_management()
     
     # AI 프롬프트 튜닝
-    with tab3:
+    with tab2:
         render_prompt_tuning()
     
     # Notion 설정
-    with tab4:
+    with tab3:
         render_notion_settings()

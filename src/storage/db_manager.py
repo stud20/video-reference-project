@@ -159,25 +159,7 @@ class VideoAnalysisDB:
         return doc_id
     
     def save_analysis_result(self, video_id: str, analysis_data: Dict[str, Any]) -> int:
-        """
-        AI 분석 결과 저장
-        
-        Args:
-            video_id: 영상 ID
-            analysis_data: 분석 결과 딕셔너리
-                - genre: 장르
-                - reasoning: 판단 이유
-                - features: 특징 및 특이사항
-                - tags: 태그 리스트
-                - expression_style: 표현형식
-                - mood_tone: 분위기와 톤
-                - target_audience: 타겟 고객층
-                - analyzed_scenes: 분석에 사용된 씬 정보
-                - token_usage: 토큰 사용량
-        
-        Returns:
-            document_id: 저장된 문서 ID
-        """
+        """AI 분석 결과 저장 - 확장된 씬 정보 포함"""
         Analysis = Query()
         
         analysis_record = {
@@ -190,12 +172,14 @@ class VideoAnalysisDB:
             'mood_tone': analysis_data.get('mood_tone', ''),
             'target_audience': analysis_data.get('target_audience', ''),
             'analyzed_scenes': analysis_data.get('analyzed_scenes', []),
+            'total_scenes': analysis_data.get('total_scenes', 0),  # 추가
+            'grouped_scenes': analysis_data.get('grouped_scenes', 0),  # 추가
+            'precision_level': analysis_data.get('precision_level', 5),  # 추가
             'token_usage': analysis_data.get('token_usage', {}),
             'model_used': analysis_data.get('model_used', 'gpt-4o'),
             'analysis_date': datetime.now().isoformat(),
-            'version': '1.0'  # 분석 버전 관리
+            'version': '1.0'
         }
-        
         # 기존 분석 결과가 있는지 확인
         existing = self.analyses_table.search(
             (Analysis.video_id == video_id) & 

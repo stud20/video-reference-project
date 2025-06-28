@@ -1,13 +1,9 @@
-# src/ui/components/settings_notion.py
-"""
-Settings 탭 - Notion 연동 설정
-"""
+# src/ui/tabs/settings_notion.py
 
 import streamlit as st
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
-import webbrowser
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,13 +18,13 @@ def render_notion_settings():
     
     st.markdown("---")
     
-    # API 설정
-    render_api_settings()
+    # API 설정 (읽기 전용)
+    render_api_settings_readonly()
     
     st.markdown("---")
     
-    # 페이지 바로가기
-    render_page_shortcuts()
+    # 연동 정보 및 바로가기
+    render_connection_info()
 
 
 def render_current_status():
@@ -37,154 +33,191 @@ def render_current_status():
     
     # 환경변수 읽기
     api_key = os.getenv("NOTION_API_KEY", "")
-    page_id = os.getenv("NOTION_PARENT_PAGE_ID", "")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if api_key:
-            # API 키 마스킹 표시
-            masked_key = api_key[:7] + "*" * (len(api_key) - 10) + api_key[-3:] if len(api_key) > 10 else "***"
-            st.success(f"✅ API 키 설정됨: {masked_key}")
-        else:
-            st.error("❌ API 키 미설정")
-    
-    with col2:
-        if page_id:
-            st.success(f"✅ 데이터베이스 ID: {page_id[:8]}...")
-        else:
-            st.warning("⚠️ 데이터베이스 ID 미설정")
-    
-    # 연결 상태 테스트
-    if api_key:
-        if st.button("🔌 연결 테스트", key="test_notion_connection"):
-            test_notion_connection()
-
-
-def render_api_settings():
-    """API 설정 입력 폼"""
-    st.subheader("🔑 API 설정")
-    
-    # 현재 값 읽기
-    current_api_key = os.getenv("NOTION_API_KEY", "")
-    current_page_id = os.getenv("NOTION_PARENT_PAGE_ID", "")
-    
-    with st.form("notion_api_form"):
-        # API 키 입력
-        st.markdown("**Notion API 키**")
-        st.caption("Notion Integration 페이지에서 발급받은 API 키를 입력하세요.")
-        
-        api_key = st.text_input(
-            "API 키",
-            value=current_api_key,
-            type="password",
-            placeholder="secret_...",
-            label_visibility="collapsed"
-        )
-        
-        # 데이터베이스 ID 입력
-        st.markdown("**데이터베이스 ID**")
-        st.caption("영상 분석 결과를 저장할 Notion 데이터베이스의 ID를 입력하세요.")
-        
-        page_id = st.text_input(
-            "데이터베이스 ID",
-            value=current_page_id,
-            placeholder="32자리 데이터베이스 ID (예: a1b2c3d4e5f6...)",
-            label_visibility="collapsed"
-        )
-        
-        # 도움말
-        with st.expander("❓ Notion 설정 방법"):
-            st.markdown("""
-            ### 1. API 키 발급
-            1. [Notion Integrations](https://www.notion.so/my-integrations) 페이지 방문
-            2. "New integration" 클릭
-            3. 이름 입력 후 생성
-            4. "Internal Integration Token" 복사
-            
-            ### 2. 데이터베이스 ID 찾기
-            1. Notion에서 데이터베이스 페이지 열기
-            2. 우측 상단 "..." 메뉴 → "Copy link"
-            3. URL에서 데이터베이스 ID 추출:
-               - `https://notion.so/{workspace}/{데이터베이스ID}?v=...`
-               - 하이픈(-) 제거한 32자리 문자열
-            
-            ### 3. 데이터베이스 권한 설정
-            1. 데이터베이스 우측 상단 "Share" 클릭
-            2. "Invite" → Integration 선택
-            3. 생성한 Integration 추가
-            
-            ### 4. 데이터베이스 필수 속성
-            데이터베이스에 다음 속성들이 있어야 합니다:
-            - 제목 (Title)
-            - URL (URL)
-            - 장르 (Select)
-            - 태그 (Multi-select)
-            - 분석일 (Date)
-            """)
-        
-        # 저장 버튼
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            save_button = st.form_submit_button("💾 저장", type="primary", use_container_width=True)
-        
-        if save_button:
-            save_notion_settings(api_key, page_id)
-
-
-def render_page_shortcuts():
-    """Notion 데이터베이스 바로가기"""
-    st.subheader("📊 데이터베이스 바로가기")
-    
-    page_id = os.getenv("NOTION_PARENT_PAGE_ID", "")
-    
-    if page_id:
-        # 데이터베이스 정보 가져오기
-        database_info = get_notion_page_info(page_id)
-        
-        if database_info:
-            st.info(f"📊 데이터베이스: {database_info.get('title', 'Untitled')}")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("🌐 Notion에서 열기", key="open_notion_page", use_container_width=True):
-                    open_notion_page(database_info.get('url'))
-            
-            with col2:
-                if st.button("🔄 정보 새로고침", key="refresh_page_info", use_container_width=True):
-                    st.rerun()
-            
-            with col3:
-                if st.button("📋 URL 복사", key="copy_notion_url", use_container_width=True):
-                    st.code(database_info.get('url', ''), language=None)
-                    st.success("URL이 표시되었습니다. 복사해서 사용하세요.")
-        else:
-            st.warning("데이터베이스 정보를 가져올 수 없습니다. API 키와 데이터베이스 ID를 확인해주세요.")
-    else:
-        st.info("데이터베이스 ID를 설정하면 바로가기 기능을 사용할 수 있습니다.")
-    
-    # 업로드 통계 (간단히)
-    st.markdown("---")
-    st.subheader("📊 업로드 통계")
+    database_id = os.getenv("NOTION_DATABASE_ID", "")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # 세션 상태에서 통계 가져오기 (임시)
-        uploaded_count = st.session_state.get('notion_uploaded_count', 0)
-        st.metric("오늘 업로드", f"{uploaded_count}개")
+        if api_key:
+            st.success("✅ API 키 설정됨")
+        else:
+            st.error("❌ API 키 미설정")
     
     with col2:
-        failed_count = st.session_state.get('notion_failed_count', 0)
-        st.metric("실패", f"{failed_count}개")
+        if database_id:
+            st.success("✅ Database 연결됨")
+        else:
+            st.error("❌ Database 미설정")
     
     with col3:
-        if st.button("📈 통계 초기화", key="reset_notion_stats", use_container_width=True):
-            st.session_state.notion_uploaded_count = 0
-            st.session_state.notion_failed_count = 0
-            st.success("통계가 초기화되었습니다.")
-            st.rerun()
+        # 연결 테스트
+        if api_key and database_id:
+            if st.button("🔌 연결 테스트", key="test_notion_connection", use_container_width=True):
+                test_notion_connection()
+
+
+def render_api_settings_readonly():
+    """API 설정 표시 (읽기 전용)"""
+    st.subheader("🔑 API 설정")
+    
+    current_api_key = os.getenv("NOTION_API_KEY", "")
+    current_database_id = os.getenv("NOTION_DATABASE_ID", "")
+    
+    if current_api_key or current_database_id:
+        # 설정이 있는 경우 - 읽기 전용으로 표시
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if current_api_key:
+                # 마스킹된 키 표시
+                masked_key = current_api_key[:10] + "*" * 20 + current_api_key[-5:]
+                st.text_input(
+                    "Notion API 키",
+                    value=masked_key,
+                    disabled=True,
+                    help="API 키는 보안을 위해 마스킹되어 표시됩니다"
+                )
+            else:
+                st.text_input(
+                    "Notion API 키",
+                    value="미설정",
+                    disabled=True
+                )
+        
+        with col2:
+            if current_database_id:
+                # Database ID 일부만 표시
+                masked_db_id = current_database_id[:8] + "..." + current_database_id[-4:]
+                st.text_input(
+                    "Database ID",
+                    value=masked_db_id,
+                    disabled=True,
+                    help="Database ID는 일부만 표시됩니다"
+                )
+            else:
+                st.text_input(
+                    "Database ID",
+                    value="미설정",
+                    disabled=True
+                )
+        
+        # 변경 안내
+        with st.expander("⚙️ API 설정 변경 방법", expanded=False):
+            st.markdown("""
+            ### API 설정을 변경하려면:
+            
+            1. **프로젝트 루트의 `.env` 파일을 열어주세요**
+               ```
+               NOTION_API_KEY=your_api_key_here
+               NOTION_DATABASE_ID=your_database_id_here
+               ```
+            
+            2. **값을 수정한 후 저장하세요**
+            
+            3. **Streamlit 앱을 재시작하세요**
+               - 터미널에서 `Ctrl+C`로 중지
+               - `streamlit run app.py` 다시 실행
+            
+            ⚠️ **주의사항**:
+            - API 키는 절대 외부에 노출되지 않도록 주의하세요
+            - `.env` 파일은 Git에 커밋하지 마세요
+            - 변경은 시스템 관리자만 수행해야 합니다
+            """)
+            
+    
+    else:
+        # 초기 설정이 필요한 경우
+        render_initial_setup_guide()
+
+
+def render_initial_setup_guide():
+    """초기 설정 가이드"""
+    st.info("📝 Notion API가 아직 설정되지 않았습니다.")
+    
+    with st.expander("🚀 초기 설정 가이드", expanded=True):
+        st.markdown("""
+        ### 1. Notion API 키 발급
+        1. [Notion Integrations](https://www.notion.so/my-integrations) 페이지 방문
+        2. "New integration" 클릭
+        3. 이름 입력 후 생성
+        4. "Internal Integration Token" 복사
+        
+        ### 2. Database 생성 및 ID 찾기
+        1. Notion에서 새 Database 페이지 생성
+        2. 우측 상단 "..." → "Copy link"
+        3. URL에서 Database ID 추출:
+           ```
+           https://notion.so/workspace/1234567890abcdef...
+                                      ^^^^^^^^^^^^^^^^^ (이 부분)
+           ```
+        
+        ### 3. .env 파일 생성
+        프로젝트 루트에 `.env` 파일을 생성하고 다음 내용 추가:
+        ```
+        NOTION_API_KEY=secret_xxxxxxxxxxxxx
+        NOTION_DATABASE_ID=1234567890abcdef
+        ```
+        
+        ### 4. Database 권한 설정
+        1. Database 페이지에서 "Share" 클릭
+        2. "Invite" → 생성한 Integration 선택
+        3. "Full access" 권한 부여
+        """)
+        
+        # .env 템플릿 다운로드
+        if st.button("📥 .env 템플릿 다운로드"):
+            env_template = """# Notion API 설정
+NOTION_API_KEY=secret_your_api_key_here
+NOTION_DATABASE_ID=your_database_id_here
+
+# 기타 설정
+OPENAI_API_KEY=your_openai_key_here
+"""
+            st.download_button(
+                label="💾 .env 템플릿 저장",
+                data=env_template,
+                file_name=".env.template",
+                mime="text/plain"
+            )
+
+
+def render_connection_info():
+    """연동 정보 및 바로가기"""
+    api_key = os.getenv("NOTION_API_KEY", "")
+    database_id = os.getenv("NOTION_DATABASE_ID", "")
+    
+    if api_key and database_id:
+        st.subheader("📄 연동 정보")
+        
+        # Database 정보 가져오기
+        db_info = get_database_info()
+        
+        if db_info:
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.info(f"📊 Database: **{db_info.get('title', 'Untitled')}**")
+                
+                # 프로퍼티 정보
+                with st.expander("Database 프로퍼티", expanded=False):
+                    properties = db_info.get('properties', {})
+                    if properties:
+                        for prop_name, prop_type in properties.items():
+                            st.text(f"• {prop_name}: {prop_type}")
+                    else:
+                        st.text("프로퍼티 정보를 가져올 수 없습니다.")
+            
+            with col2:
+                # Notion에서 열기 버튼
+                if st.button("🌐 Notion에서 열기", key="open_notion_db", use_container_width=True):
+                    db_url = f"https://www.notion.so/{database_id.replace('-', '')}"
+                    st.markdown(f'<a href="{db_url}" target="_blank">Database 열기</a>', unsafe_allow_html=True)
+                    st.info("위 링크를 클릭하세요")
+                
+        else:
+            st.warning("Database 정보를 가져올 수 없습니다.")
+    else:
+        st.info("API 설정이 완료되면 연동 정보가 표시됩니다.")
 
 
 def test_notion_connection():
@@ -197,114 +230,65 @@ def test_notion_connection():
             if notion.test_connection():
                 st.success("✅ Notion 연결 성공!")
                 
-                # 데이터베이스 정보 가져오기
-                page_id = os.getenv("NOTION_PARENT_PAGE_ID", "")
-                if page_id:
-                    database_info = get_notion_page_info(page_id)
-                    if database_info:
-                        st.info(f"📊 연결된 데이터베이스: {database_info.get('title', 'Untitled')}")
-                    else:
-                        st.warning("데이터베이스 정보를 가져올 수 없습니다. 데이터베이스 ID와 권한을 확인해주세요.")
+                # Database 정보 표시
+                db_info = get_database_info()
+                if db_info:
+                    st.info(f"연결된 Database: **{db_info.get('title', 'Untitled')}**")
+                    
             else:
-                st.error("❌ Notion 연결 실패! API 키를 확인해주세요.")
+                st.error("❌ Notion 연결 실패! 설정을 확인해주세요.")
                 
-        except ImportError:
-            st.error("Notion 서비스 모듈을 찾을 수 없습니다.")
         except ValueError as e:
             st.error(f"❌ {str(e)}")
         except Exception as e:
-            st.error(f"연결 테스트 중 오류 발생: {str(e)}")
+            st.error(f"연결 테스트 중 오류: {str(e)}")
 
 
-def save_notion_settings(api_key: str, page_id: str):
-    """Notion 설정 저장"""
+def get_database_info() -> Optional[Dict[str, Any]]:
+    """Database 정보 가져오기"""
     try:
-        # .env 파일 경로
-        env_path = Path(".env")
+        from services.notion_service import NotionService
         
-        # 기존 .env 내용 읽기
-        env_content = {}
-        if env_path.exists():
-            with open(env_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        env_content[key.strip()] = value.strip().strip('"\'')
+        notion = NotionService()
         
-        # 새 값 업데이트
-        if api_key:
-            env_content['NOTION_API_KEY'] = api_key
-            os.environ['NOTION_API_KEY'] = api_key
+        # Database 정보 조회
+        db_props = notion.get_database_properties()
         
-        if page_id:
-            # 페이지 ID에서 하이픈 제거
-            clean_page_id = page_id.replace('-', '')
-            env_content['NOTION_PARENT_PAGE_ID'] = clean_page_id
-            os.environ['NOTION_PARENT_PAGE_ID'] = clean_page_id
+        # Database 제목은 별도로 가져와야 함
+        database_id = os.getenv("NOTION_DATABASE_ID", "")
         
-        # .env 파일 다시 쓰기
-        with open(env_path, 'w', encoding='utf-8') as f:
-            for key, value in env_content.items():
-                # 값에 공백이나 특수문자가 있으면 따옴표로 감싸기
-                if ' ' in value or any(c in value for c in ['#', '$', '&', '(', ')', '|', ';']):
-                    f.write(f'{key}="{value}"\n')
-                else:
-                    f.write(f'{key}={value}\n')
-        
-        st.success("✅ Notion 설정이 저장되었습니다!")
-        
-        # 연결 테스트 자동 실행
-        if api_key:
-            test_notion_connection()
-            
-    except Exception as e:
-        st.error(f"설정 저장 중 오류 발생: {str(e)}")
-        logger.error(f"Notion 설정 저장 오류: {str(e)}")
-
-
-def get_notion_page_info(page_id: str) -> Optional[Dict[str, Any]]:
-    """Notion 데이터베이스 정보 가져오기"""
-    try:
-        # 간단히 URL과 기본 정보만 반환
-        # NotionService의 실제 구조를 모르므로 기본 정보만 제공
         return {
-            'id': page_id,
-            'url': f"https://greatminds.notion.site/{page_id.replace('-', '')}",
-            'title': f"Database ({page_id[:8]}...)",
-            'type': 'database'
+            'id': database_id,
+            'title': 'Video Analysis Database',  # 실제 제목 가져오기는 추가 구현 필요
+            'properties': db_props
         }
         
     except Exception as e:
-        logger.error(f"데이터베이스 정보 생성 실패: {str(e)}")
+        logger.error(f"Database 정보 조회 실패: {str(e)}")
         return None
 
 
-def open_notion_page(url: str):
-    """Notion 페이지를 웹 브라우저에서 열기"""
-    try:
-        # Streamlit Cloud 환경에서는 JavaScript 사용
-        st.markdown(
-            f'<a href="{url}" target="_blank" style="display: inline-block; '
-            f'background-color: #007ACC; color: white; padding: 10px 20px; '
-            f'text-decoration: none; border-radius: 5px; margin-top: 10px;">'
-            f'🌐 Notion에서 열기 (새 탭)</a>',
-            unsafe_allow_html=True
-        )
-        
-        # 로컬 환경에서는 webbrowser 사용 (선택적)
-        if os.getenv("STREAMLIT_ENV") != "cloud":
-            webbrowser.open(url)
-            
-    except Exception as e:
-        st.error(f"페이지 열기 실패: {str(e)}")
-        st.info(f"URL: {url}")
+# 사용자가 실수로 설정을 변경하지 못하도록 추가 보호
+def render_settings_protection_notice():
+    """설정 보호 안내"""
+    st.markdown("""
+    <div style="background-color: #fef3c7; padding: 15px; border-radius: 10px; margin: 10px 0;">
+        <p style="color: #92400e; margin: 0;">
+            <strong>🔒 보안 안내</strong><br>
+            API 설정은 시스템 보안을 위해 읽기 전용으로 표시됩니다.<br>
+            설정 변경이 필요한 경우 시스템 관리자에게 문의하세요.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-# 초기화 함수
 def init_notion_stats():
     """Notion 통계 초기화"""
-    if 'notion_uploaded_count' not in st.session_state:
-        st.session_state.notion_uploaded_count = 0
+    if 'notion_upload_count' not in st.session_state:
+        st.session_state.notion_upload_count = 0
+    
     if 'notion_failed_count' not in st.session_state:
         st.session_state.notion_failed_count = 0
+    
+    if 'notion_last_upload' not in st.session_state:
+        st.session_state.notion_last_upload = None

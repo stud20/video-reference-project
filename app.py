@@ -4,7 +4,7 @@ AI 기반 광고 영상 콘텐츠 추론 시스템 - 깔끔한 UI
 """
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)  # 기존 환경변수를 덮어쓰도록 설정
 
 import streamlit as st
 import sys

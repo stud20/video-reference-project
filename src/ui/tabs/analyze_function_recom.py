@@ -304,11 +304,12 @@ def execute_reanalysis(video):
         if hasattr(st.session_state, 'video_service') and st.session_state.video_service.ai_analyzer:
             ai_analyzer = st.session_state.video_service.ai_analyzer
             
-            # 기존 scenes를 백업 (무드보드를 위해)
             original_scenes = video.scenes.copy() if hasattr(video, 'scenes') else []
-            
+            original_grouped_scenes = video.grouped_scenes.copy() if hasattr(video, 'grouped_scenes') else []
+
             # 재추론을 위해 선택된 씬들로 교체
-            video.scenes = selected_scenes
+            video.scenes = selected_scenes  # 이 부분 추가!
+            video.grouped_scenes = selected_scenes
             
             update_console("AI 분석 시작...", "🧠")
             update_console("이미지 특징 추출 중...", "🔬")

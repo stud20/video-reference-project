@@ -20,15 +20,38 @@ from src.models.video import Scene
 logger = get_logger(__name__)
 
 
+
 class SceneExtractor:
     """영상에서 주요 씬을 추출하고 정밀도 레벨에 따라 정교하게 그룹화"""
     
     def __init__(self):
-        self.logger = logger
+        self.logger = get_logger(__name__)
         self.temp_dir = "data/temp"
         
-        # 정밀도 레벨 (1-10)
-        self.precision_level = int(os.getenv("SCENE_PRECISION_LEVEL", "5"))
+        # 기본값 설정 (load_settings 전에 초기화)
+        self.precision_level = 5
+        self.target_scene_count = 6  # 기본값 설정
+        
+        # 초기 설정 로드
+        self.load_settings()
+        
+        # 정밀도 레벨별 특징 가중치 및 목표 씬 개수 설정
+        self._setup_precision_weights()
+        
+        self.logger.info(f"🎯 SceneExtractor 초기화 - 정밀도 레벨: {self.precision_level}")
+    
+    def load_settings(self):
+        """환경변수에서 설정 로드"""
+        # 정밀도 레벨 (1-10) - 따옴표 처리 추가
+        precision_str = os.getenv("SCENE_PRECISION_LEVEL")
+        # 따옴표 제거
+        precision_str = precision_str.strip("'\"")
+        
+        try:
+            self.precision_level = int(precision_str)
+        except ValueError:
+            self.logger.warning(f"잘못된 SCENE_PRECISION_LEVEL 값: {precision_str}, 기본값 5 사용")
+            self.precision_level = 5
         
         # 씬 추출 설정
         self.scene_threshold = float(os.getenv("SCENE_THRESHOLD", "0.3"))
@@ -40,10 +63,45 @@ class SceneExtractor:
         self.hash_threshold = int(os.getenv("SCENE_HASH_THRESHOLD", "5"))
         self.max_output_scenes = int(os.getenv("MAX_ANALYSIS_IMAGES", "10"))
         
-        # 정밀도 레벨별 특징 가중치 및 목표 씬 개수 설정
-        self._setup_precision_weights()
+        # 로그 추가하여 실제 로드된 값 확인
+        self.logger.info(f"📋 설정 로드 완료:")
+        self.logger.info(f"  - SCENE_PRECISION_LEVEL: {self.precision_level}")
+        # target_scene_count는 _setup_precision_weights 이후에 설정되므로 여기서는 로그하지 않음
         
-        self.logger.info(f"🎯 SceneExtractor 초기화 - 정밀도 레벨: {self.precision_level}")
+    def update_settings(self):
+        """환경변수에서 최신 설정을 다시 읽어옴"""
+        # 이전 설정 저장
+        old_precision_level = self.precision_level
+        old_scene_threshold = self.scene_threshold
+        old_similarity_threshold = self.similarity_threshold
+        
+        # 새로운 설정 로드
+        self.load_settings()
+        
+        # 변경사항 로깅
+        settings_changed = False
+        
+        if old_precision_level != self.precision_level:
+            self.logger.info(f"🔄 정밀도 레벨 변경: {old_precision_level} → {self.precision_level}")
+            settings_changed = True
+        
+        if abs(old_scene_threshold - self.scene_threshold) > 0.001:
+            self.logger.info(f"🔄 씬 전환 임계값 변경: {old_scene_threshold:.3f} → {self.scene_threshold:.3f}")
+            settings_changed = True
+        
+        if abs(old_similarity_threshold - self.similarity_threshold) > 0.001:
+            self.logger.info(f"🔄 씬 유사도 임계값 변경: {old_similarity_threshold:.3f} → {self.similarity_threshold:.3f}")
+            settings_changed = True
+        
+        # 정밀도 레벨이 변경되었으면 가중치 재설정
+        if old_precision_level != self.precision_level:
+            self._setup_precision_weights()
+            self.logger.info(f"✅ 정밀도 레벨 {self.precision_level} 설정 적용 완료")
+        
+        if not settings_changed:
+            self.logger.debug("설정 변경사항 없음")
+        
+        return settings_changed
     
     def _setup_precision_weights(self):
         """정밀도 레벨에 따른 특징 가중치 및 출력 설정"""
@@ -148,21 +206,27 @@ class SceneExtractor:
         self.logger.info(f"📋 활성화된 특징: {', '.join(self.active_features)}")
         self.logger.info(f"🎯 목표 씬 개수: {self.target_scene_count}개")
     
-    def extract_scenes(self, video_path: str, session_id: str) -> List[Scene]:
-        """정밀도 레벨에 따른 비디오 씬 추출 및 그룹화"""
+        
+    def extract_scenes(self, video_path: str, session_id: str) -> Dict[str, Any]:
+        """비디오에서 모든 씬 추출 후 정밀도에 따라 그룹화"""
+        # 시작하기 전에 최신 설정 로드
+        settings_changed = self.update_settings()
+        if settings_changed:
+            self.logger.info("🔄 변경된 설정으로 씬 추출을 시작합니다")
+        
         try:
             output_dir = os.path.join(self.temp_dir, session_id, "scenes")
             os.makedirs(output_dir, exist_ok=True)
             
-            self.logger.info(f"🎬 씬 추출 시작 (정밀도 레벨: {self.precision_level})")
+            self.logger.info(f"🎬 씬 추출 시작")
             
-            # 1. FFmpeg로 씬 전환점 검출
+            # 1. FFmpeg로 모든 씬 전환점 검출 (정밀도와 무관)
             self.logger.info("🔍 씬 전환점 검출 중...")
             scene_changes = self._detect_scene_changes(video_path)
             
             if not scene_changes:
                 self.logger.warning("씬 전환점을 찾을 수 없습니다")
-                return []
+                return {'all_scenes': [], 'grouped_scenes': []}
             
             # 2. 비디오 정보 가져오기
             video_info = self._get_video_info(video_path)
@@ -170,53 +234,48 @@ class SceneExtractor:
             
             self.logger.info(f"📹 영상 길이: {duration:.1f}초")
             
-            # 3. 씬 중간점에서 프레임 추출
-            scenes = self._extract_frames_at_midpoints(
+            # 3. 모든 씬 중간점에서 프레임 추출
+            all_scenes = self._extract_frames_at_midpoints(
                 video_path, scene_changes, output_dir, duration
             )
             
-            self.logger.info(f"📸 {len(scenes)}개 초기 씬 추출 완료")
+            self.logger.info(f"📸 총 {len(all_scenes)}개 씬 추출 완료")
             
             # 4. 정밀도 레벨에 따른 그룹화 수행
-            if len(scenes) > self.min_scenes_for_grouping:
+            grouped_scenes = []
+            if len(all_scenes) > 0:
                 self.logger.info(f"🔬 정밀도 레벨 {self.precision_level}로 씬 그룹화 시작...")
-                scenes = self._group_similar_scenes_precision(scenes, output_dir)
-            else:
-                # 씬이 적은 경우에도 목표 개수 조정
-                if len(scenes) > self.target_scene_count:
-                    scenes = self._select_diverse_scenes(scenes)[:self.target_scene_count]
+                grouped_scenes = self._group_similar_scenes_precision(all_scenes.copy(), output_dir)
+                
+                # 그룹화된 씬들을 별도 디렉토리에 저장
+                grouped_scenes = self._save_grouped_scenes(grouped_scenes, session_id)
             
-            # 5. 최종 씬 수 확인 및 조정
-            if len(scenes) > self.target_scene_count:
-                scenes = self._select_diverse_scenes(scenes)[:self.target_scene_count]
-            elif len(scenes) < self.target_scene_count and len(scenes) > 0:
-                # 부족한 경우 시간적 분산으로 추가 추출 시도
-                self.logger.info(f"⚠️ 목표 {self.target_scene_count}개보다 적은 {len(scenes)}개 추출됨")
+            self.logger.info(
+                f"✅ 씬 추출 완료 - 전체: {len(all_scenes)}개, "
+                f"그룹화: {len(grouped_scenes)}개 (정밀도 레벨: {self.precision_level})"
+            )
             
-            # 6. 그룹화된 씬들을 별도로 저장
-            scenes = self._save_grouped_scenes(scenes, session_id)
+            # 5. 결과 반환 (전체 씬과 그룹화된 씬 모두 포함)
+            return {
+                'all_scenes': all_scenes,
+                'grouped_scenes': grouped_scenes,
+                'precision_level': self.precision_level,
+                'target_count': self.target_scene_count
+            }
             
-            self.logger.info(f"✅ 최종 {len(scenes)}개 대표 씬 추출 완료 (정밀도 레벨: {self.precision_level})")
-            
-            return scenes
-        
         except Exception as e:
-            self.logger.error(f"씬 추출 중 오류 (정밀도 레벨 {self.precision_level}): {str(e)}")
-            return []
-    
+            self.logger.error(f"씬 추출 중 오류: {str(e)}")
+            return {'all_scenes': [], 'grouped_scenes': []}
+        
     def _detect_scene_changes(self, video_path: str) -> List[float]:
-        """FFmpeg를 사용한 씬 전환점 검출"""
-        # 정밀도 레벨에 따른 임계값 조정
-        adjusted_threshold = self.scene_threshold
-        if self.precision_level >= 8:
-            adjusted_threshold *= 0.8  # 더 민감하게
-        elif self.precision_level <= 3:
-            adjusted_threshold *= 1.2  # 덜 민감하게
+        """FFmpeg를 사용한 모든 씬 전환점 검출 (정밀도와 무관)"""
+        # 정밀도 레벨 조정 제거 - 항상 동일한 임계값 사용
+        threshold = self.scene_threshold
         
         cmd = [
             'ffmpeg',
             '-i', video_path,
-            '-filter:v', f"select='gt(scene,{adjusted_threshold})',showinfo",
+            '-filter:v', f"select='gt(scene,{threshold})',showinfo",
             '-f', 'null',
             '-'
         ]
@@ -245,7 +304,7 @@ class SceneExtractor:
             elif not timestamps:
                 timestamps = [0.0]
             
-            self.logger.info(f"🎞️ {len(timestamps)}개 씬 전환점 검출 (조정된 임계값: {adjusted_threshold:.3f})")
+            self.logger.info(f"🎞️ {len(timestamps)}개 씬 전환점 검출 (임계값: {threshold:.3f})")
             
             return timestamps
             
@@ -394,13 +453,13 @@ class SceneExtractor:
         
         return final_scenes
 
-    def _save_grouped_scenes(self, final_scenes: List[Scene], session_id: str) -> List[Scene]:
-        """그룹화된 씬들을 별도로 저장"""
+    def _save_grouped_scenes(self, grouped_scenes: List[Scene], session_id: str) -> List[Scene]:
+        """그룹화된 씬들을 별도 디렉토리에 저장"""
         grouped_dir = os.path.join(self.temp_dir, session_id, "grouped")
         os.makedirs(grouped_dir, exist_ok=True)
         
         updated_scenes = []
-        for i, scene in enumerate(final_scenes):
+        for i, scene in enumerate(grouped_scenes):
             # 원본 씬 이미지 경로
             original_path = scene.frame_path
             
@@ -421,9 +480,9 @@ class SceneExtractor:
             except Exception as e:
                 self.logger.error(f"그룹화된 씬 복사 실패: {str(e)}")
                 updated_scenes.append(scene)
-    
+        
         return updated_scenes
-    
+        
     def _balance_scene_selection(self, cluster_reps: List[Scene], noise_scenes: List[Scene], all_scenes: List[Scene]) -> List[Scene]:
         """목표 개수에 맞춘 균형잡힌 씬 선택"""
         current_count = len(cluster_reps) + len(noise_scenes)

@@ -29,6 +29,24 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
         import os
         os.environ["SCENE_PRECISION_LEVEL"] = str(precision_level)
         
+        # ===== PROMPT DEBUG START - 삭제 예정 =====
+        # AI Analyzer에서 프롬프트 가로채기를 위한 임시 변수 설정
+        if hasattr(video_service, 'ai_analyzer') and video_service.ai_analyzer:
+            original_call_gpt4 = video_service.ai_analyzer._call_gpt4_vision
+            captured_prompt = None
+            captured_system_prompt = None
+            
+            def debug_call_gpt4_vision(image_payloads, prompt):
+                nonlocal captured_prompt, captured_system_prompt
+                captured_prompt = prompt
+                captured_system_prompt = video_service.ai_analyzer.system_prompt
+                # 원래 함수 호출
+                return original_call_gpt4(image_payloads, prompt)
+            
+            # 임시로 함수 교체
+            video_service.ai_analyzer._call_gpt4_vision = debug_call_gpt4_vision
+        # ===== PROMPT DEBUG END - 삭제 예정 =====
+        
         # 진행 상황 메시지 매핑
         step_messages = {
             'parsing': {
@@ -135,7 +153,37 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             progress_callback=progress_callback
         )
         
-                # 분석 완료 후 추가 정보 출력
+        # ===== PROMPT DEBUG START - 삭제 예정 =====
+        # 캡처된 프롬프트 표시
+        if 'captured_prompt' in locals() and captured_prompt:
+            console_callback("\n" + "="*60)
+            console_callback("🔍 [DEBUG] ChatGPT 요청 내용")
+            console_callback("="*60)
+            
+            # 시스템 프롬프트 표시
+            console_callback("\n📌 시스템 프롬프트:")
+            console_callback("-" * 40)
+            console_callback(captured_system_prompt)
+            console_callback("-" * 40)
+            
+            # 사용자 프롬프트 표시
+            console_callback("\n📝 사용자 프롬프트:")
+            console_callback("-" * 40)
+            console_callback(captured_prompt)
+            console_callback("-" * 40)
+            
+            # 프롬프트 정보
+            console_callback(f"\n📊 프롬프트 정보:")
+            console_callback(f"  - 시스템 프롬프트 길이: {len(captured_system_prompt)}자")
+            console_callback(f"  - 사용자 프롬프트 길이: {len(captured_prompt)}자")
+            console_callback(f"  - 예상 토큰 수: 약 {(len(captured_system_prompt) + len(captured_prompt)) * 0.3:.0f}개")
+            console_callback("="*60 + "\n")
+            
+            # 원래 함수로 복원
+            video_service.ai_analyzer._call_gpt4_vision = original_call_gpt4
+        # ===== PROMPT DEBUG END - 삭제 예정 =====
+        
+        # 분석 완료 후 추가 정보 출력
         if video:
             console_callback("━" * 50)
             console_callback("📊 분석 결과 요약:")
@@ -171,7 +219,7 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
                     db.close()
                     
                     if video_data and analysis_data:
-                        success, message = notion.add_video_analysis_to_page(
+                        success, message = notion.add_video_to_database(
                             video_data,
                             analysis_data
                         )
