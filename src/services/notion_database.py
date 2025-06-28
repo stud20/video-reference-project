@@ -194,26 +194,21 @@ class NotionDatabaseService(NotionBaseService):
     # notion_database.py의 _get_video_thumbnail 메서드 수정
     def _get_video_thumbnail(self, video_data: Dict[str, Any]) -> str:
         """
-        비디오 썸네일 URL 가져오기 (플랫폼 통합)
+        비디오 썸네일 URL 가져오기 (자체 서버에서)
         """
-        # 1. 먼저 thumbnail 필드 확인 (Vimeo 등)
-        thumbnail = self.safe_get(video_data, 'thumbnail', '')
-        if thumbnail:
-            logger.debug(f"🖼️ 썸네일 URL (from data): {thumbnail}")
-            return thumbnail
+        # session_id 가져오기 (video_id와 동일)
+        session_id = self.safe_get(video_data, 'session_id', self.safe_get(video_data, 'video_id', ''))
         
-        # 2. YouTube의 경우 video_id로 생성
-        platform = self.safe_get(video_data, 'platform', '').lower()
-        video_id = self.safe_get(video_data, 'video_id', '')
+        if not session_id:
+            logger.warning("⚠️ session_id를 찾을 수 없어 썸네일 URL 생성 불가")
+            return ''
         
-        if platform == 'youtube' and video_id:
-            youtube_thumbnail = self.get_youtube_thumbnail_url(video_id)
-            logger.debug(f"🖼️ YouTube 썸네일 URL (generated): {youtube_thumbnail}")
-            return youtube_thumbnail
+        # 자체 서버 URL 생성
+        base_url = "https://sof.greatminds.kr"
+        thumbnail_url = f"{base_url}/{session_id}/{session_id}_Thumbnail.jpg"
         
-        # 3. 기본값
-        logger.warning(f"⚠️ 썸네일 URL을 찾을 수 없음 - platform: {platform}, video_id: {video_id}")
-        return ''
+        logger.debug(f"🖼️ 썸네일 URL (자체 서버): {thumbnail_url}")
+        return thumbnail_url
     
     def create_page(self, 
                    properties: Dict[str, Any], 

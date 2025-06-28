@@ -50,9 +50,20 @@ def main():
     # 페이지 설정
     setup_page()
     
-    # 헤더 제거하고 바로 탭으로 시작
-    # 탭 생성
-    tab1, tab2, tab3 = st.tabs(["🎯 Analyze", "📊 Database", "⚙️ Settings"])
+    # 메인 헤더 추가 - Figma 디자인
+    st.markdown("""
+        <div class="main-header">
+            <h1 class="main-title">Sense of Frame</h1>
+            <p class="powered-by">Powered by greatminds.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # 탭 생성 - Figma 스타일
+    tab1, tab2, tab3 = st.tabs([
+        "ANALYZE", 
+        "DATABASE", 
+        "SETTINGS"
+    ])
     
     with tab1:
         render_analyze_tab()
@@ -62,6 +73,14 @@ def main():
     
     with tab3:
         render_settings_tab()
+    
+    # Footer 추가
+    st.markdown("""
+        <div class="footer">
+            <p>서강대학교 미디어커뮤니케이션 대학원</p>
+            <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
+        </div>
+    """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":

@@ -43,7 +43,57 @@ class YouTubeDownloader:
         safe_title = safe_title.strip('_ ')
         # 최대 길이 제한
         return safe_title[:max_length]
-    
+
+    def _normalize_url(self, url: str) -> str:
+        """
+        YouTube URL을 표준 형식으로 정규화
+        
+        지원하는 형식:
+        - https://www.youtube.com/watch?v=VIDEO_ID&param=value
+        - https://youtu.be/VIDEO_ID?param=value
+        - https://youtube.com/watch?v=VIDEO_ID
+        - https://m.youtube.com/watch?v=VIDEO_ID
+        
+        Returns:
+            표준 형식 URL: https://www.youtube.com/watch?v=VIDEO_ID
+        """
+        try:
+            # 비디오 ID 추출을 위한 패턴들
+            patterns = [
+                # 표준 YouTube URL
+                r'(?:https?://)?(?:www\.)?(?:m\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})',
+                # 단축 URL
+                r'(?:https?://)?youtu\.be/([a-zA-Z0-9_-]{11})',
+                # embed URL
+                r'(?:https?://)?(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})',
+                # mobile URL
+                r'(?:https?://)?m\.youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})'
+            ]
+            
+            video_id = None
+            for pattern in patterns:
+                match = re.search(pattern, url)
+                if match:
+                    video_id = match.group(1)
+                    break
+            
+            if not video_id:
+                # URL이 유효하지 않은 경우 원본 반환
+                self.logger.warning(f"YouTube 비디오 ID를 추출할 수 없습니다: {url}")
+                return url
+            
+            # 표준 형식으로 변환
+            normalized_url = f"https://www.youtube.com/watch?v={video_id}"
+            self.logger.info(f"URL 정규화: {url} -> {normalized_url}")
+            
+            return normalized_url
+            
+        except Exception as e:
+            self.logger.error(f"URL 정규화 중 오류: {str(e)}")
+            return url
+
+
+
     def download(self, url: str) -> Dict[str, Any]:
         """
         비디오 다운로드 - 메타데이터 추출 및 macOS 호환성 보장
@@ -55,6 +105,8 @@ class YouTubeDownloader:
             다운로드 결과 딕셔너리 (확장된 메타데이터 포함)
         """
         try:
+        # URL 정규화
+            url = self._normalize_url(url)
             # 1. 먼저 정보만 추출
             self.logger.info(f"📊 메타데이터 추출 중: {url}")
             with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:

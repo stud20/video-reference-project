@@ -160,6 +160,139 @@ class NotionService:
         
         return success_count, fail_count, errors
     
+
+    # src/services/notion_service.py에 추가할 메서드들
+
+    def find_video_blocks(self, video_id: str) -> List[str]:
+        """
+        특정 비디오 ID를 포함하는 데이터베이스 항목 찾기
+        
+        Args:
+            video_id: 찾을 비디오 ID
+            
+        Returns:
+            페이지 ID 리스트
+        """
+        try:
+            # 데이터베이스에서 video_id로 검색
+            response = self.db_service.client.databases.query(
+                database_id=self.db_service.database_id,
+                filter={
+                    "property": "영상 ID",
+                    "rich_text": {
+                        "equals": video_id
+                    }
+                }
+            )
+            
+            # 페이지 ID들 추출
+            page_ids = [page['id'] for page in response.get('results', [])]
+            
+            logger.info(f"🔍 Notion에서 {len(page_ids)}개 페이지 발견: {video_id}")
+            return page_ids
+            
+        except Exception as e:
+            logger.error(f"Notion 검색 오류: {str(e)}")
+            return []
+
+    def delete_block(self, block_id: str) -> bool:
+        """
+        Notion 페이지(블록) 삭제
+        
+        Args:
+            block_id: 삭제할 블록 ID
+            
+        Returns:
+            성공 여부
+        """
+        try:
+            # 페이지 아카이브 (Notion API는 실제 삭제 대신 아카이브를 사용)
+            self.db_service.client.pages.update(
+                page_id=block_id,
+                archived=True
+            )
+            
+            logger.info(f"✅ Notion 페이지 아카이브 완료: {block_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Notion 페이지 삭제 오류: {str(e)}")
+            return False
+
+    def delete_video_from_notion(self, video_id: str) -> Tuple[bool, str]:
+        """
+        비디오를 Notion에서 완전히 삭제
+        
+        Args:
+            video_id: 삭제할 비디오 ID
+            
+        Returns:
+            (성공 여부, 메시지)
+        """
+        try:
+            # 1. 해당 비디오의 모든 페이지 찾기
+            page_ids = self.find_video_blocks(video_id)
+            
+            if not page_ids:
+                return True, "Notion에 해당 영상이 없음"
+            
+            # 2. 각 페이지 삭제(아카이브)
+            deleted_count = 0
+            failed_count = 0
+            
+            for page_id in page_ids:
+                if self.delete_block(page_id):
+                    deleted_count += 1
+                else:
+                    failed_count += 1
+            
+            # 3. 결과 반환
+            if failed_count == 0:
+                return True, f"{deleted_count}삭제 완료"
+            elif deleted_count > 0:
+                return False, f"{deleted_count}개 삭제, {failed_count}개 실패"
+            else:
+                return False, f"삭제 실패 ({failed_count}개)"
+                
+        except Exception as e:
+            error_msg = f"Notion 삭제 중 오류: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def bulk_delete_from_notion(self, video_ids: List[str]) -> Tuple[int, int, List[str]]:
+        """
+        여러 비디오를 Notion에서 일괄 삭제
+        
+        Args:
+            video_ids: 삭제할 비디오 ID 리스트
+            
+        Returns:
+            (성공 개수, 실패 개수, 오류 메시지 리스트)
+        """
+        success_count = 0
+        fail_count = 0
+        errors = []
+        
+        for video_id in video_ids:
+            try:
+                success, message = self.delete_video_from_notion(video_id)
+                
+                if success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                    errors.append(f"{video_id}: {message}")
+                    
+                # API 제한 방지
+                time.sleep(0.2)
+                
+            except Exception as e:
+                fail_count += 1
+                errors.append(f"{video_id}: {str(e)}")
+        
+        return success_count, fail_count, errors
+
+
     # 데이터베이스 서비스 메서드들을 직접 노출
     def search_videos(self, **kwargs):
         """영상 검색"""

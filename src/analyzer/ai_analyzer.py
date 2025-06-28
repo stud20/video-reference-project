@@ -383,105 +383,136 @@ A7. 예상 타겟 고객층
         
         self.logger.info("📝 응답 파싱 시작...")
         
-        # 응답을 줄 단위로 분리
-        lines = response.strip().split('\n')
+        # 응답을 줄 단위로 분리하고 빈 줄 제거
+        lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
         
-        # 빈 줄 제거
-        lines = [line.strip() for line in lines if line.strip()]
+        # A1~A7 레이블 제거 함수
+        def clean_line(line: str) -> str:
+            """A1., A2. 같은 레이블 제거"""
+            # "A숫자. " 패턴 제거
+            cleaned = re.sub(r'^A\d+\.\s*', '', line)
+            # "#A숫자. " 패턴도 제거 (태그에서)
+            cleaned = re.sub(r'#A\d+\.\s*', '#', cleaned)
+            return cleaned.strip()
         
-        # 파싱 결과 초기화
-        parsed = {
-            'genre': '',
-            'reason': '',
-            'features': '',
-            'tags': [],
-            'format_type': '',
-            'mood': '',
-            'target_audience': ''
-        }
-        
-        # 텍스트를 섹션으로 분리 (두 줄 이상의 빈 줄로 구분)
-        sections = response.strip().split('\n\n')
-        
-        # 섹션이 7개가 아니면 다른 방식으로 파싱 시도
-        if len(sections) < 7:
-            # 각 줄을 하나씩 확인하면서 파싱
-            self.logger.info(f"섹션 수: {len(sections)}, 대체 파싱 방식 사용")
+        try:
+            parsed = {
+                'genre': '',
+                'reason': '',
+                'features': '',
+                'tags': [],
+                'format_type': '',
+                'mood': '',
+                'target_audience': ''
+            }
             
-            # 첫 번째 줄은 장르
-            if lines:
-                parsed['genre'] = lines[0].strip()
-                self.logger.debug(f"장르: {parsed['genre']}")
+            # 텍스트를 섹션으로 분리 (두 줄 이상의 빈 줄로 구분)
+            sections = response.strip().split('\n\n')
             
-            # 나머지 내용을 하나의 텍스트로 합쳐서 파싱
-            remaining_text = '\n'.join(lines[1:])
-            
-            # 각 섹션을 구분할 수 있는 키워드나 패턴 찾기
-            # 긴 텍스트는 reason과 features일 가능성이 높음
-            paragraphs = [p.strip() for p in remaining_text.split('\n\n') if p.strip()]
-            
-            if len(paragraphs) >= 6:
-                parsed['reason'] = paragraphs[0]
-                parsed['features'] = paragraphs[1]
+            # 충분한 섹션이 있는 경우
+            if len(sections) >= 7:
+                # A1. 장르
+                parsed['genre'] = clean_line(sections[0].strip())
+                # 장르에서 "• 실사" 같은 표현형식이 붙어있으면 분리
+                if '•' in parsed['genre']:
+                    parts = parsed['genre'].split('•')
+                    parsed['genre'] = parts[0].strip()
+                    if len(parts) > 1:
+                        parsed['format_type'] = parts[1].strip()
                 
-                # 태그 찾기 (쉼표로 구분된 리스트)
-                for p in paragraphs[2:]:
-                    if ',' in p and len(p.split(',')) > 5:
-                        parsed['tags'] = [tag.strip() for tag in p.split(',')]
-                        break
+                # A2. 판단 이유
+                parsed['reason'] = clean_line(sections[1].strip())
                 
-                # 표현형식 찾기 (FORMAT_TYPES 중 하나)
-                for p in paragraphs:
-                    for fmt in self.FORMAT_TYPES:
-                        if fmt in p and len(p) < 20:  # 짧은 텍스트
-                            parsed['format_type'] = fmt
-                            break
+                # A3. 특징
+                parsed['features'] = clean_line(sections[2].strip())
+                if parsed['features'] == '분석 내용 없음':
+                    parsed['features'] = ''
                 
-                # 나머지 짧은 문장들은 mood와 target_audience
-                short_paragraphs = [p for p in paragraphs if len(p) < 200 and p not in [parsed['reason'], parsed['features']]]
-                if len(short_paragraphs) >= 2:
-                    parsed['mood'] = short_paragraphs[-2]
-                    parsed['target_audience'] = short_paragraphs[-1]
-        
-        else:
-            # 섹션이 7개 이상이면 순서대로 할당
-            parsed['genre'] = sections[0].strip()
-            parsed['reason'] = sections[1].strip()
-            parsed['features'] = sections[2].strip()
+                # A4. 태그
+                tags_text = clean_line(sections[3].strip())
+                # 태그에서 # 기호 제거하고 파싱
+                tags_text = tags_text.replace('#', '')
+                parsed['tags'] = [tag.strip() for tag in tags_text.split(',') if tag.strip()]
+                
+                # A5. 표현형식 (이미 위에서 처리했으면 스킵)
+                if not parsed['format_type'] and len(sections) > 4:
+                    parsed['format_type'] = clean_line(sections[4].strip())
+                
+                # A6. 분위기
+                if len(sections) > 5:
+                    parsed['mood'] = clean_line(sections[5].strip())
+                
+                # A7. 타겟 고객층
+                if len(sections) > 6:
+                    parsed['target_audience'] = clean_line(sections[6].strip())
             
-            # 태그 처리
-            tags_text = sections[3].strip()
-            parsed['tags'] = [tag.strip() for tag in tags_text.split(',')]
+            else:
+                # 섹션이 부족한 경우 대체 파싱
+                self.logger.info(f"섹션 수 부족: {len(sections)}, 라인별 파싱 시도")
+                
+                current_idx = 0
+                
+                # 각 라인을 순서대로 처리
+                for i, line in enumerate(lines):
+                    cleaned = clean_line(line)
+                    
+                    # 장르 (첫 번째 유효한 라인)
+                    if not parsed['genre'] and cleaned:
+                        # "스팟광고 • 실사" 형태 처리
+                        if '•' in cleaned:
+                            parts = cleaned.split('•')
+                            parsed['genre'] = parts[0].strip()
+                            parsed['format_type'] = parts[1].strip() if len(parts) > 1 else ''
+                        else:
+                            parsed['genre'] = cleaned
+                    
+                    # 200자 이상의 긴 텍스트는 reason 또는 features
+                    elif len(cleaned) > 200:
+                        if not parsed['reason']:
+                            parsed['reason'] = cleaned
+                        elif not parsed['features']:
+                            parsed['features'] = cleaned
+                    
+                    # 쉼표가 많은 라인은 태그
+                    elif ',' in cleaned and cleaned.count(',') >= 5:
+                        tags_text = cleaned.replace('#', '')
+                        parsed['tags'] = [tag.strip() for tag in tags_text.split(',') if tag.strip()]
+                    
+                    # 표현형식 찾기
+                    elif any(fmt in cleaned for fmt in self.FORMAT_TYPES) and not parsed['format_type']:
+                        for fmt in self.FORMAT_TYPES:
+                            if fmt in cleaned:
+                                parsed['format_type'] = fmt
+                                break
+                    
+                    # 짧은 문장들은 분위기나 타겟
+                    elif 50 < len(cleaned) < 200:
+                        if not parsed['mood']:
+                            parsed['mood'] = cleaned
+                        elif not parsed['target_audience']:
+                            parsed['target_audience'] = cleaned
             
-            parsed['format_type'] = sections[4].strip()
-            parsed['mood'] = sections[5].strip()
-            parsed['target_audience'] = sections[6].strip()
-        
-        # 파싱 결과 검증 및 정리
-        if not parsed['genre']:
-            self.logger.error("장르가 파싱되지 않음")
+            # 결과 생성
+            result = AnalysisResult(
+                genre=parsed['genre'] or 'Unknown',
+                reason=parsed['reason'] or '분석 내용 없음',
+                features=parsed['features'] or '분석 내용 없음',
+                tags=parsed['tags'] or [],
+                format_type=parsed['format_type'] or '실사',
+                mood=parsed['mood'] or '',
+                target_audience=parsed['target_audience'] or ''
+            )
+            
+            self.logger.info(f"✅ 파싱 완료 - 장르: {result.genre}, 태그 수: {len(result.tags)}")
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"파싱 중 오류: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return None
         
-        # 장르가 유효한지 확인
-        if parsed['genre'] not in self.GENRES:
-            self.logger.warning(f"파싱된 장르가 목록에 없음: {parsed['genre']}")
-            # 가장 유사한 장르 찾기 (옵션)
-        
-        # 결과 생성
-        result = AnalysisResult(
-            genre=parsed['genre'],
-            reason=parsed['reason'] or '분석 내용 없음',
-            features=parsed['features'] or '분석 내용 없음',
-            tags=parsed['tags'] or [],
-            format_type=parsed['format_type'] or '실사',
-            mood=parsed['mood'],
-            target_audience=parsed['target_audience']
-        )
-        
-        self.logger.info(f"✅ 파싱 완료 - 장르: {result.genre}, 태그 수: {len(result.tags)}")
-        
-        return result
-    
     def _save_analysis_result(self, video: Video, result: AnalysisResult):
         """분석 결과 저장"""
         # Video 객체에 결과 저장 (DB 스키마에 맞게 키 이름 변경)

@@ -135,7 +135,7 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             progress_callback=progress_callback
         )
         
-        # 분석 완료 후 추가 정보 출력
+                # 분석 완료 후 추가 정보 출력
         if video:
             console_callback("━" * 50)
             console_callback("📊 분석 결과 요약:")
@@ -153,6 +153,43 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
                     console_callback(f"  🏷️ 주요 태그: {', '.join(tags)}")
             
             console_callback("━" * 50)
+            
+            # Notion 업데이트 추가
+            if video.analysis_result:
+                console_callback("📝 Notion 데이터베이스 업데이트 중...")
+                
+                try:
+                    from services.notion_service import NotionService
+                    from storage.db_manager import VideoAnalysisDB
+                    
+                    notion = NotionService()
+                    db = VideoAnalysisDB()
+                    
+                    # 영상 정보 가져오기
+                    video_data = db.get_video_info(video.session_id)
+                    analysis_data = db.get_latest_analysis(video.session_id)
+                    db.close()
+                    
+                    if video_data and analysis_data:
+                        success, message = notion.add_video_analysis_to_page(
+                            video_data,
+                            analysis_data
+                        )
+                        
+                        if success:
+                            console_callback("✅ Notion 업데이트 성공!")
+                        else:
+                            console_callback(f"❌ Notion 업데이트 실패: {message}")
+                    else:
+                        console_callback("⚠️ 데이터 준비 실패")
+                        
+                except ImportError:
+                    console_callback("⚠️ Notion 서비스를 찾을 수 없습니다")
+                    logger.warning("Notion service not available")
+                except Exception as e:
+                    console_callback(f"⚠️ Notion 업데이트 중 오류: {str(e)}")
+                    logger.error(f"Notion update error: {str(e)}")
+            
             console_callback("🎉 모든 처리가 완료되었습니다!")
         
         return video
