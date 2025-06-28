@@ -29,7 +29,6 @@ class VideoService:
             storage_type: 사용할 스토리지 타입
         """
         self.downloader = YouTubeDownloader()
-        self.scene_extractor = SceneExtractor()
         
         # AI 분석기 안전한 초기화
         self.ai_analyzer = None
@@ -244,6 +243,7 @@ class VideoService:
             
             # 6. 씬 추출
             update_progress("extract", 50, "🎬 주요 씬 추출 시작...")
+            scene_extractor = SceneExtractor()
             scenes_result = self.scene_extractor.extract_scenes(
                 video.local_path, 
                 video.session_id

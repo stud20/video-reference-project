@@ -300,8 +300,8 @@ def get_enhanced_styles() -> str:
     /* ===================
        Analyze 탭 전용 입력 필드 (key 기반)
        =================== */
-    /* analyze_url_input key를 가진 입력 필드 */
-    input[id="text_input_1"] {
+
+    div.st-key-analyze_url_input > div > div > div > input {
         background: linear-gradient(180deg, #001022 0%, #001c3a 100%) !important;
         border-radius: 16px !important;
         color: #ffffff !important;
@@ -310,7 +310,40 @@ def get_enhanced_styles() -> str:
         height: 54px !important;
         padding: 0 24px !important;
         text-align: center !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        transition: all 0.3s ease !important;
     }
+
+    /* 포커스 상태 */
+    div.st-key-analyze_url_input > div > div > div > input:focus {
+        outline: none !important;
+        border: 1px solid #4a9eff !important;
+        box-shadow: 0 0 20px rgba(74, 158, 255, 0.3) !important;
+    }
+
+    /* database_tab_search */
+    div.st-key-db_search_input > div > div > div > input {
+        background: linear-gradient(180deg, #001022 0%, #001c3a 100%) !important;
+        border-radius: 1px !important;
+        color: #ffffff !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 16px !important;
+        height: 38px !important;
+        padding: 0 12px !important;
+        text-align: left !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    /* 포커스 상태 */
+    div.st-key-db_search_input > div > div > div > input:focus {
+        outline: none !important;
+        border: 1px solid #4a9eff !important;
+        box-shadow: 0 0 20px rgba(74, 158, 255, 0.3) !important;
+    }
+
+
+
     
     /* analyze_url_input의 컨테이너들 */
     div:has(> input[id="text_input_1"]) {
@@ -352,33 +385,26 @@ def get_enhanced_styles() -> str:
     /* ===================
        버튼
        =================== */
-    .stButton button {
+
+    div.st-key-analyze_start_button div button::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: -100% !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: linear-gradient(
+            90deg, 
+            transparent, 
+            rgba(255, 255, 255, 0.3), 
+            transparent
+        ) !important;
+        transition: left 0.5s !important;
+    }
+
+    div.st-key-analyze_start_button div button {
+        position: relative !important;
         background: var(--gradient-button) !important;
-        border: none !important;  /* 기본 border 제거 */
-        border-radius: 16px !important;
-        box-shadow: 
-            inset 0 0 0 1px rgba(0, 0, 0, 0.2),  /* 안쪽 테두리 */
-            0 0 30px rgba(255, 255, 255, 0.3) !important;  /* 바깥쪽 글로우 */
-        color: #ffffff !important;
-        font-family: 'Poppins', sans-serif !important;
-        font-size: 20px !important;
-        font-weight: 900 !important;
-        height: 56px !important;
-        min-width: 120px !important;
-        padding: 0 30px !important;
-        transition: all 0.3s ease;
-    }
-
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 
-            inset 0 0 0 1px rgba(0, 0, 0, 0.2),  /* 안쪽 테두리 유지 */
-            0 5px 40px rgba(73, 224, 160, 0.4) !important;  /* 호버 시 글로우 */
-    }
-
-
-    div.stDownloadButton button[kind="secondary"][data-testid="stBaseButton-secondary"] {
-        background: var(--gradient-button-c) !important;
         border: none !important;
         border-radius: 16px !important;
         box-shadow: 
@@ -391,16 +417,136 @@ def get_enhanced_styles() -> str:
         height: 56px !important;
         min-width: 120px !important;
         padding: 0 30px !important;
-        transition: all 0.3s ease !important;
+        cursor: pointer !important;
+        overflow: hidden !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transform: perspective(1px) translateZ(0) !important;
     }
 
-
-    div.stDownloadButton button[kind="secondary"][data-testid="stBaseButton-secondary"]:hover {
-        transform: translateY(-2px) !important;
+    /* 호버 효과 - 부드러운 상승과 그림자 */
+    div.st-key-analyze_start_button div button:hover {
+        background: var(--gradient-button-c) !important;
+        transform: translateY(-4px) scale(1.02) !important;
         box-shadow: 
             inset 0 0 0 1px rgba(0, 0, 0, 0.2),
-            0 5px 40px rgba(73, 224, 160, 0.4) !important;
+            0 10px 40px rgba(200, 200, 200, 0.4),
+            0 15px 60px rgba(200, 200, 200, 0.2) !important;
     }
+
+    /* 클릭(활성) 상태 - 눌림 효과 */
+    div.st-key-analyze_start_button div button:active {
+        transform: translateY(-1px) scale(0.98) !important;
+        box-shadow: 
+            inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+            0 2px 15px rgba(73, 224, 160, 0.3) !important;
+        transition: all 0.1s ease !important;
+    }
+
+    div[class*="st-key-vc_"] > div > button {
+        /* 정사각형 버튼 */
+        padding: 0 !important;
+        
+        /* 기본 스타일 */
+        border: 1px solid #404040 !important;
+        background: rgba(0, 0, 0, 0.1) !important;
+        border-radius: 12px !important;
+        
+        /* 버튼 기본 설정 */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* 버튼 내부 텍스트/아이콘 스타일 */
+    div[class*="st-key-vc_"] > div > button > div p {
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 12px !important;
+    }
+
+    /* 호버 효과 - 절제된 스타일 */
+    div[class*="st-key-vc_"] > div > button:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: #606060 !important;
+    }
+
+
+    div[class*="st-key"] > div > div > div > div > button {
+        /* 정사각형 버튼 */
+        padding: 0 !important;
+        
+        /* 기본 스타일 */
+        border: 1px solid #404040 !important;
+        background: rgba(0, 0, 0, 0.1) !important;
+        border-radius: 12px !important;
+        
+        /* 버튼 기본 설정 */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* 호버 효과 - 절제된 스타일 */
+    div[class*="st-key"] > div > div > div > div > button:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: #606060 !important;
+    }
+
+
+
+    /* 포커스 효과 - 접근성 */
+    div[class*="st-key"] > div > div > div > div > button:focus {
+        outline: none !important;
+        border-color: #666666 !important;
+        box-shadow: 
+            0px 4px 4px 0px rgba(0, 0, 0, 0.25),
+            0 0 0 2px rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* 버튼 내부 텍스트/아이콘 스타일 */
+    div[class*="st-key"] > div > div > div > div > button * {
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 12px !important;
+    }
+
+    /* 호버 시 내부 요소 */
+    div[class*="st-key"] > div > div > div > div > button:hover * {
+        color: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    div[class*="st-key"] > div > div > div[data-baseweb="base-input"] {
+        border: 1px solid #404040 !important;
+        background: rgba(0, 0, 0, 0.1) !important;
+        border-radius: 12px !important;
+
+    }
+
+    div[class*="st-key"] > div > div[data-baseweb="textarea"] {
+    border: 1px solid #404040 !important;
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    min-height: 120px !important;  /* 최소 높이 설정 */
+    height: auto !important;        /* 내용에 따라 자동 확장 */
+    }
+
+    /* 실제 textarea 요소 스타일 */
+    div[class*="st-key"] > div > div[data-baseweb="textarea"] > div[data-baseweb="base-input"] textarea {
+    color: #b0b0b0 !important;     /* 옅은 회색 텍스트 */
+    background: transparent !important;
+    border: none !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    min-height: 100px !important;   /* textarea 자체의 최소 높이 */
+    resize: vertical !important;
+}
+
+
+
+
 
     /* ===================
        기본 입력/버튼 스타일 (다른 탭용)
@@ -465,5 +611,88 @@ def get_enhanced_styles() -> str:
     .block-container {
         padding-bottom: 80px !important;
     }
+
+    /* ===================
+       Database 카드 스타일
+       =================== */
+    /* 텍스트 영역 패딩 줄이기 */
+    .db-card-container .stTextArea > div > div > textarea {
+        padding: 0.5rem;
+    }
+    
+    .db-card-container .stTextInput > div > div > input {
+        padding: 0.5rem;
+    }
+    
+    /* 비디오 카드 기본 스타일 */
+    .video-card {
+        border: 1px solid #303842;
+        border-radius: 10px;
+        padding: 1.5rem 1rem 3rem 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .video-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-color: #c0c0c0;
+    }
+    
+    /* 썸네일 플레이스홀더 */
+    .thumbnail-placeholder {
+        width: 100%;
+        height: 80px;
+        background: #444;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+        font-size: 24px;
+    }
+    
+    /* 태그 컨테이너 */
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-height: 120px;
+        overflow-y: auto;
+    }
+    
+    /* YouTube 태그 */
+    .tag-youtube {
+        background-color: #007ACC;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+    
+    /* AI 태그 */
+    .tag-ai {
+        background-color: #28a745;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    /* 비디오 카드 - stylable_container용 */
+    [data-testid*="video_card_"] > div:first-child {
+        border: 1px solid #303842 !important;
+        border-radius: 10px !important;
+        padding: 1.5rem 1rem 3rem 1rem !important;
+        margin-bottom: 1rem !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    [data-testid*="video_card_"] > div:first-child:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+        border-color: #c0c0c0 !important;
+    }
+
     </style>
     """

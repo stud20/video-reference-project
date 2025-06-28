@@ -1,5 +1,8 @@
 import streamlit as st
 import os
+import re
+import urllib.parse
+import requests
 from typing import Dict, Any, List
 from storage.db_manager import VideoAnalysisDB
 from utils.logger import get_logger
@@ -7,11 +10,16 @@ from ui.tabs.database_edit import render_editable_card_info, save_edited_data, t
 from streamlit_extras.stylable_container import stylable_container
 import time  # 여기에 추가
 
+
+
+
 logger = get_logger(__name__)
 
 
 def render_video_cards_section(videos: List[Dict[str, Any]], items_per_page: int = 10):
     """비디오 카드 섹션 전체 렌더링"""
+    # 컨테이너에 클래스 추가
+    st.markdown('<div class="db-card-container">', unsafe_allow_html=True) 
     if not videos:
         st.info("검색 결과가 없습니다")
         return
@@ -28,24 +36,7 @@ def render_video_cards_section(videos: List[Dict[str, Any]], items_per_page: int
     end_idx = start_idx + items_per_page
     page_videos = videos[start_idx:end_idx]
     
-    # 통계 표시
-    st.markdown(f"### 📹 영상 목록 (총 {len(videos)}개)")
-    
-    # 텍스트 영역 패딩 줄이기 위한 CSS
-    st.markdown("""
-        <style>
-        .stTextArea > div > div > textarea {
-            padding: 0.5rem;
-        }
-        .stTextInput > div > div > input {
-            padding: 0.5rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    # 전체 선택 체크박스
-    render_select_all_checkbox(page_videos)
-    
+
     # 비디오 카드 렌더링
     for video in page_videos:
         render_single_video_card(video)
@@ -57,111 +48,60 @@ def render_video_cards_section(videos: List[Dict[str, Any]], items_per_page: int
             st.rerun()
 
 
-def render_select_all_checkbox(page_videos: List[Dict[str, Any]]):
-    """전체 선택 체크박스"""
-    col1, col2 = st.columns([1, 10])
-    with col1:
-        # 현재 페이지의 모든 비디오가 선택되었는지 확인
-        all_selected = all(
-            video['video_id'] in st.session_state.get('selected_videos', [])
-            for video in page_videos
-        )
-        
-        select_all = st.checkbox("전체", value=all_selected, key="select_all_db")
-        
-        if select_all:
-            # 현재 페이지의 모든 비디오 선택
-            if 'selected_videos' not in st.session_state:
-                st.session_state.selected_videos = []
-            
-            for video in page_videos:
-                if video['video_id'] not in st.session_state.selected_videos:
-                    st.session_state.selected_videos.append(video['video_id'])
-        else:
-            # 현재 페이지의 모든 비디오 선택 해제
-            if 'selected_videos' in st.session_state:
-                for video in page_videos:
-                    if video['video_id'] in st.session_state.selected_videos:
-                        st.session_state.selected_videos.remove(video['video_id'])
+def sanitize_filename(title: str, max_length: int = 100) -> str:
+    """파일명으로 사용 가능한 문자열로 변환"""
+    safe_title = re.sub(r'[<>:"/\\|?*]', '_', title)
+    safe_title = re.sub(r'_+', '_', safe_title)
+    safe_title = safe_title.strip('_ ')
+    return safe_title[:max_length]
 
 
 def render_single_video_card(video: Dict[str, Any]):
     """단일 비디오 카드 렌더링"""
     video_id = video.get('video_id', 'unknown')
     
-    # 선택 상태 확인
-    if 'selected_videos' not in st.session_state:
-        st.session_state.selected_videos = []
-    
-    is_selected = video_id in st.session_state.selected_videos
-    
     # 편집 모드 확인
     is_edit_mode = st.session_state.get('edit_mode') == video_id
     
-    # 선택 상태에 따른 스타일 정의
-    if is_selected:
-        card_style = """
-        {
-            border: 1px solid #2196f3;
-            border-radius: 10px;
-            padding: 1.5rem 1rem 3rem 1rem;
-            margin-bottom: 1rem;
-        }
-        """
-    else:
-        card_style = """
-        {
-            border: 1px solid #303842;
-            border-radius: 10px;
-            padding: 1.5rem 1rem 3rem 1rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }
-        &:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border-color: #c0c0c0;
-        }
-        """
+    # 고정 스타일 (선택 상태 제거)
+    card_style = """
+    {
+        border: 1px solid #303842;
+        border-radius: 10px;
+        padding: 1.5rem 1rem 3rem 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    &:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-color: #c0c0c0;
+    }
+    """
     
     # stylable_container로 카드 감싸기
     with stylable_container(
         key=f"video_card_{video_id}",
         css_styles=card_style
     ):
-        # 카드 내용 - 칼럼 비율 조정
-        col1, col2, col3, col4, col5 = st.columns([0.2, 1.5, 5, 1.5, 0.3])
+        # 카드 내용 - 칼럼 비율 조정 (col3 제거하고 col2 비율 증가)
+        col1, col2, col3 = st.columns([2, 6, 1])  # 태그 컬럼 제거, 정보 컬럼 확장
         
-        # 체크박스
+        # 썸네일 및 태그
         with col1:
-            if st.checkbox("", value=is_selected, key=f"select_{video_id}", label_visibility="collapsed"):
-                if video_id not in st.session_state.selected_videos:
-                    st.session_state.selected_videos.append(video_id)
-                    st.rerun()
-            else:
-                if video_id in st.session_state.selected_videos:
-                    st.session_state.selected_videos.remove(video_id)
-                    st.rerun()
-        
-        # 썸네일
-        with col2:
             render_thumbnail(video)
+            # 썸네일 하단에 태그 추가
+            if not is_edit_mode:  # 편집 모드가 아닐 때만 태그 표시
+                render_video_tags(video)
         
         # 정보 - 편집 모드 확인
-        with col3:
+        with col2:
             if is_edit_mode:
                 render_editable_card_info(video)
             else:
                 render_video_info(video)
         
-        # 태그
-        with col4:
-            if not is_edit_mode:  # 편집 모드가 아닐 때만 태그 표시
-                render_video_tags(video)
-            else:
-                st.write("")  # 편집 모드일 때는 빈 공간
-        
         # 액션 버튼
-        with col5:
+        with col3:
             render_card_actions(video_id, video)
     
     # 무드보드가 열려있는지 확인하고 렌더링
@@ -193,14 +133,7 @@ def render_thumbnail(video: Dict[str, Any]):
             first_scene_url = f"{base_url}/{session_id}/scene_0000.jpg"
             st.image(first_scene_url, use_container_width=True)
         except:
-            # 모든 이미지 로드 실패 시 기본 아이콘 표시
-            st.markdown("""
-            <div style="width: 100%; height: 80px; background: #444; 
-                        border-radius: 8px; display: flex; align-items: center; 
-                        justify-content: center; color: #888; font-size: 24px;">
-                📹
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown('<div class="thumbnail-placeholder">📹</div>', unsafe_allow_html=True)
             logger.error(f"썸네일 로드 실패: {thumbnail_url}")
 
 
@@ -241,7 +174,7 @@ def render_video_info(video: Dict[str, Any]):
                 "💭 판단 이유",
                 value=reasoning,
                 key=f"view_reasoning_{video.get('video_id')}",
-                height=100,
+                height=120,
                 disabled=True,
                 label_visibility="visible"
             )
@@ -253,7 +186,7 @@ def render_video_info(video: Dict[str, Any]):
                 "✨ 특징",
                 value=features,
                 key=f"view_features_{video.get('video_id')}",
-                height=100,
+                height=120,
                 disabled=True,
                 label_visibility="visible"
             )
@@ -265,7 +198,7 @@ def render_video_info(video: Dict[str, Any]):
                 "🎭 분위기",
                 value=mood,
                 key=f"view_mood_{video.get('video_id')}",
-                height=70,
+                height=90,
                 disabled=True,
                 label_visibility="visible"
             )
@@ -277,7 +210,7 @@ def render_video_info(video: Dict[str, Any]):
                 "🎯 타겟 고객층",
                 value=target,
                 key=f"view_target_{video.get('video_id')}",
-                height=70,
+                height=90,
                 disabled=True,
                 label_visibility="visible"
             )
@@ -299,17 +232,17 @@ def render_video_tags(video: Dict[str, Any]):
     
     # 태그 HTML 생성
     if youtube_tags or ai_tags:
-        tags_html = '<div style="display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto;">'
+        tags_html = '<div class="tags-container">'
         
         # YouTube 태그 (파란색) - 전체 표시
         for tag in youtube_tags:
             if tag and len(tag) > 1:
-                tags_html += f'<span style="background-color: #007ACC; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; white-space: nowrap;">#{tag}</span>'
+                tags_html += f'<span class="tag-youtube">#{tag}</span>'
         
         # AI 태그 (초록색) - 전체 표시
         for tag in ai_tags:
             if tag and tag not in youtube_tags:
-                tags_html += f'<span style="background-color: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; white-space: nowrap;">#{tag}</span>'
+                tags_html += f'<span class="tag-ai">#{tag}</span>'
         
         tags_html += '</div>'
         st.markdown(tags_html, unsafe_allow_html=True)
@@ -317,14 +250,52 @@ def render_video_tags(video: Dict[str, Any]):
         st.caption("태그 없음")
 
 def render_card_actions(video_id: str, video: Dict[str, Any]):
-    """카드 액션 버튼들 - 세로 배치"""
-    # 다운로드 버튼
-    if st.button("💾", key=f"download_{video_id}", help="다운로드", use_container_width=True):
-        from ui.tabs.database_download import handle_video_download
-        handle_video_download(video_id, video)
+    """카드 액션 버튼들 - 세로 배치, 아웃라인 스타일"""
     
+    # 버튼 스타일 적용
+    st.markdown(f"""
+    <style>
+    /* 액션 버튼 컨테이너 스타일 */
+    div[data-testid="column"]:has(button[key^="vc_download_{video_id}"],
+                                   button[key^="vc_mood_{video_id}"],
+                                   button[key^="vc_edit_{video_id}"],
+                                   button[key^="vc_save_{video_id}"],
+                                   button[key^="vc_delete_{video_id}"]) button {{
+        background-color: transparent !important;
+        border: 1px solid #4a4a52 !important;
+        color: #fafafa !important;
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        height: 32px !important;
+        transition: all 0.2s ease !important;
+    }}
+    
+    div[data-testid="column"]:has(button[key^="vc_download_{video_id}"],
+                                   button[key^="vc_mood_{video_id}"],
+                                   button[key^="vc_edit_{video_id}"],
+                                   button[key^="vc_save_{video_id}"],
+                                   button[key^="vc_delete_{video_id}"]) button:hover {{
+        border-color: #1f77b4 !important;
+        background-color: rgba(31, 119, 180, 0.1) !important;
+    }}
+    
+    /* 삭제 버튼 특별 스타일 */
+    button[key^="delete_{video_id}"]:not([data-testid*="secondary"]) {{
+        border-color: #ff4444 !important;
+        color: #ff4444 !important;
+    }}
+    
+    button[key^="delete_{video_id}"]:not([data-testid*="secondary"]):hover {{
+        background-color: rgba(255, 68, 68, 0.1) !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 다운로드 버튼 - 향상된 로직
+    render_download_button(video_id, video)
+
     # 무드보드 버튼
-    if st.button("🎨", key=f"mood_{video_id}", help="무드보드", use_container_width=True):
+    if st.button("🎨 무드보드", key=f"vc_mood_{video_id}", help="무드보드", use_container_width=True):
         st.session_state.show_moodboard_modal = True
         st.session_state.moodboard_video_id = video_id
         st.rerun()
@@ -333,7 +304,7 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
     is_edit_mode = st.session_state.get('edit_mode') == video_id
     if is_edit_mode:
         # 저장 버튼
-        if st.button("💾", key=f"save_{video_id}", help="저장", type="primary", use_container_width=True):
+        if st.button("✅ 완료", key=f"vc_save_{video_id}", help="저장", use_container_width=True):
             from ui.tabs.database_edit import save_edited_data
             if save_edited_data(video_id):
                 st.success("✅ 저장되었습니다!")
@@ -341,7 +312,7 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
                 st.rerun()
     else:
         # 편집 버튼
-        if st.button("✏️", key=f"edit_{video_id}", help="수정", use_container_width=True):
+        if st.button("✏️ 수정", key=f"vc_edit_{video_id}", help="수정", use_container_width=True):
             from ui.tabs.database_edit import toggle_edit_mode
             toggle_edit_mode(video_id)
             st.rerun()
@@ -353,11 +324,17 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
         button_text = get_delete_button_text(video_id)
         button_type = get_delete_button_type(video_id)
         
+        # 라벨 추가
+        if button_text == "❌":
+            button_label = "❌ 확인"
+        else:
+            button_label = "🗑️ 삭제"
+        
         if st.button(
-            button_text, 
-            key=f"delete_{video_id}", 
+            button_label, 
+            key=f"vc_delete_{video_id}", 
             help="삭제 (한 번 더 클릭하면 삭제)" if button_text == "❌" else "삭제",
-            type=button_type,
+            type=button_type if button_text == "❌" else "secondary",
             use_container_width=True
         ):
             # 삭제 핸들러 호출
@@ -372,9 +349,6 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
                     
                     if success:
                         st.success(f"✅ {message}")
-                        # 선택 목록에서 제거
-                        if video_id in st.session_state.get('selected_videos', []):
-                            st.session_state.selected_videos.remove(video_id)
                         time.sleep(1)
                         st.rerun()
                     else:
@@ -385,7 +359,80 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
                 
     except ImportError as e:
         # database_delete 모듈이 없는 경우 기존 방식으로 fallback
-        if st.button("🗑️", key=f"delete_{video_id}", help="삭제", use_container_width=True):
+        if st.button("🗑️ 삭제", key=f"delete_{video_id}", help="삭제", use_container_width=True):
             st.session_state.delete_target = video_id
             st.session_state.show_delete_single = True
             st.rerun()
+
+
+def render_download_button(video_id: str, video: Dict[str, Any]):
+    """다운로드 버튼 렌더링 - 향상된 로직"""
+    base_url = "https://sof.greatminds.kr"
+    
+    # 비디오 제목 가져오기
+    video_title = video.get('title', 'video')
+    
+    # 파일명 생성
+    sanitized_title = sanitize_filename(video_title)
+    video_filename = f"{video_id}_{sanitized_title}.mp4"
+    encoded_filename = urllib.parse.quote(video_filename)
+    video_url = f"{base_url}/{video_id}/{encoded_filename}"
+    download_filename = f"{sanitized_title}_{video_id}.mp4"
+    
+    # 다운로드 상태 관리 (각 비디오별)
+    download_state_key = f'download_state_{video_id}'
+    video_content_key = f'video_content_{video_id}'
+    
+    if download_state_key not in st.session_state:
+        st.session_state[download_state_key] = 'idle'  # idle, loading, ready
+    if video_content_key not in st.session_state:
+        st.session_state[video_content_key] = None
+    
+    # 버튼 텍스트 결정
+    if st.session_state[download_state_key] == 'idle':
+        button_text = "💾 저장"
+    elif st.session_state[download_state_key] == 'loading':
+        button_text = "⏳ 준비중..."
+    else:  # ready
+        button_text = "📥 다시 눌러 저장"
+    
+    # 단일 버튼으로 처리
+    if st.session_state[download_state_key] == 'ready' and st.session_state[video_content_key]:
+        # 다운로드 준비 완료 상태 - download_button 표시
+        st.download_button(
+            label=button_text,
+            data=st.session_state[video_content_key],
+            file_name=download_filename,
+            mime="video/mp4",
+            key=f"vc_download_video_final_{video_id}",
+            use_container_width=True,
+            on_click=lambda: (
+                setattr(st.session_state, download_state_key, 'idle'),
+                setattr(st.session_state, video_content_key, None)
+            )
+        )
+    else:
+        # 일반 버튼
+        if st.button(button_text, 
+                    use_container_width=True, 
+                    key=f"vc_download_{video_id}",
+                    disabled=(st.session_state[download_state_key] == 'loading')):
+            if st.session_state[download_state_key] == 'idle':
+                # 다운로드 시작
+                st.session_state[download_state_key] = 'loading'
+                st.rerun()
+    
+    # 로딩 중일 때 처리
+    if st.session_state[download_state_key] == 'loading':
+        try:
+            with st.spinner("비디오 다운로드 준비 중..."):
+                response = requests.get(video_url, stream=True)
+                response.raise_for_status()
+                st.session_state[video_content_key] = response.content
+                st.session_state[download_state_key] = 'ready'
+                st.rerun()
+        except Exception as e:
+            st.error(f"다운로드 준비 실패: {str(e)}")
+            logger.error(f"다운로드 실패 - URL: {video_url}, Error: {str(e)}")
+            st.session_state[download_state_key] = 'idle'
+            st.session_state[video_content_key] = None
