@@ -7,15 +7,6 @@ from dataclasses import dataclass
 load_dotenv()
 
 @dataclass
-class WebDAVConfig:
-    """WebDAV 설정"""
-    hostname: str = os.getenv("WEBDAV_HOSTNAME", "https://nas.greatminds.kr:5006")
-    login: str = os.getenv("WEBDAV_LOGIN", "dav")
-    password: str = os.getenv("WEBDAV_PASSWORD", "dav123")
-    root: str = os.getenv("WEBDAV_ROOT", "/dav/videoRef/")
-    remote_folder: str = "2025-session/"
-
-@dataclass
 class VideoConfig:
     """비디오 처리 설정"""
     max_duration: int = 600  # 10분
@@ -44,7 +35,6 @@ class Settings:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
     # Configurations
-    webdav = WebDAVConfig()
     video = VideoConfig()
     paths = PathConfig()
     

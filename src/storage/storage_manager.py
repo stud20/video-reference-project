@@ -8,8 +8,6 @@ from utils.logger import get_logger
 
 class StorageType(Enum):
     LOCAL = "local"
-    WEBDAV = "webdav"
-    SYNOLOGY_API = "synology_api"
     SFTP = "sftp"
 
 class StorageManager:
@@ -26,14 +24,6 @@ class StorageManager:
             if self.storage_type == StorageType.LOCAL:
                 from src.storage.local_storage import LocalStorage
                 return LocalStorage()
-                
-            elif self.storage_type == StorageType.WEBDAV:
-                from src.storage.webdav_client import WebDAVStorage
-                return WebDAVStorage()
-                
-            elif self.storage_type == StorageType.SYNOLOGY_API:
-                from src.storage.synology_api_client import SynologyFileStation
-                return SynologyFileStation()
                 
             elif self.storage_type == StorageType.SFTP:
                 from src.storage.sftp_client import SFTPStorage

@@ -398,7 +398,7 @@ def generate_prompt_from_settings(settings: Dict, context: Dict, image_count: in
 
 def load_prompt_settings() -> Dict:
     """프롬프트 설정 로드"""
-    settings_file = "data/prompt_settings.json"
+    settings_file = "config/prompt_settings.json"
     
     if os.path.exists(settings_file):
         try:
@@ -421,7 +421,7 @@ def load_prompt_settings() -> Dict:
 
 def save_prompt_settings(settings: Dict):
     """프롬프트 설정 저장"""
-    settings_file = "data/prompt_settings.json"
+    settings_file = "config/prompt_settings.json"
     os.makedirs("data", exist_ok=True)
     
     try:
@@ -435,7 +435,7 @@ def save_prompt_settings(settings: Dict):
 
 def reset_prompt_settings():
     """프롬프트 설정 초기화"""
-    settings_file = "data/prompt_settings.json"
+    settings_file = "config/prompt_settings.json"
     
     if os.path.exists(settings_file):
         try:

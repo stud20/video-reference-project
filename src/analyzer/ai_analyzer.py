@@ -72,7 +72,7 @@ class AIAnalyzer:
 
     def _load_prompt_settings(self):
         """프롬프트 설정 로드"""
-        settings_file = "data/prompt_settings.json"
+        settings_file = "config/prompt_settings.json"
         
         # 기본값 설정
         self.system_prompt = "당신은 광고 영상 전문 분석가입니다. 주어진 이미지들과 메타데이터를 종합적으로 분석하여 영상의 장르, 특징, 타겟 등을 상세히 분석해주세요. 메타데이터는 참고용이며, 실제 이미지 내용을 우선시하여 분석해주세요."
