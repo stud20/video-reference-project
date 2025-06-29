@@ -243,67 +243,66 @@ class VideoService:
 
             self.db.save_video_info(video_data)
             
-            # 6. 씬 추출
+                        # 6. 씬 추출
             update_progress("extract", 50, "🎬 주요 씬 추출 시작...")
             scenes_result = self.scene_extractor.extract_scenes(
                 video.local_path, 
                 video.session_id
             )
-            
+
             # Scene 객체로 변환
             video.scenes = []
-            grouped_scenes = []
-            
-            
-            # scenes_result 처리 - 새로운 구조에 맞게
+
+            # scenes_result 처리
             if isinstance(scenes_result, dict):
-                # all_scenes 처리 (전체 씬 저장)
+                # 새로운 반환 형식 처리
                 all_scenes = scenes_result.get('all_scenes', [])
-                
-                # grouped_scenes 가져오기 (AI 분석용)
                 grouped_scenes = scenes_result.get('grouped_scenes', [])
                 
                 self.logger.info(f"📊 씬 추출 결과: 전체 {len(all_scenes)}개, 그룹화 {len(grouped_scenes)}개")
                 
                 # AI 분석을 위해 그룹화된 씬 사용
                 if grouped_scenes:
-                    video.scenes = grouped_scenes
+                    scenes_to_use = grouped_scenes
                     self.logger.info(f"✅ AI 분석을 위해 {len(grouped_scenes)}개의 그룹화된 씬 사용")
                 else:
                     # 그룹화된 씬이 없으면 전체 씬 사용
-                    video.scenes = all_scenes[:self.scene_extractor.target_scene_count]
-                    self.logger.warning(f"⚠️ 그룹화된 씬이 없어 전체 씬 중 {len(video.scenes)}개 사용")
-                    
-            else:
-                # 기존 방식 호환성 유지
-                self.logger.warning("⚠️ 이전 버전의 씬 추출 결과 형식")
-                # 기존 코드 유지...
-
-            update_progress("extract", 60, f"✅ AI 분석용 씬 {len(video.scenes)}개 준비 완료")
-            
-            # 씬 데이터 처리
-            scene_count = len(scenes_list)
-            for i, scene_data in enumerate(scenes_list):
-                progress = 50 + int((i / scene_count) * 10) if scene_count > 0 else 60
-                update_progress("extract", progress, f"🎬 씬 처리 중... ({i+1}/{scene_count})")
+                    scenes_to_use = all_scenes[:10]  # 최대 10개로 제한
+                    self.logger.warning(f"⚠️ 그룹화된 씬이 없어 전체 씬 중 {len(scenes_to_use)}개 사용")
                 
-                if isinstance(scene_data, Scene):
-                    video.scenes.append(scene_data)
-                elif isinstance(scene_data, dict):
-                    scene = Scene(
-                        timestamp=scene_data.get('timestamp', 0.0),
-                        frame_path=scene_data.get('frame_path', '') or scene_data.get('path', ''),
-                        scene_type=scene_data.get('type', 'mid')
-                    )
-                    video.scenes.append(scene)
-                elif isinstance(scene_data, str):
-                    scene = Scene(
-                        timestamp=0.0,
-                        frame_path=scene_data,
-                        scene_type='mid'
-                    )
-                    video.scenes.append(scene)
-            
+                # Scene 객체로 변환
+                for scene_data in scenes_to_use:
+                    if isinstance(scene_data, Scene):
+                        video.scenes.append(scene_data)
+                    elif isinstance(scene_data, dict):
+                        scene = Scene(
+                            timestamp=scene_data.get('timestamp', 0.0),
+                            frame_path=scene_data.get('frame_path', '') or scene_data.get('path', ''),
+                            scene_type=scene_data.get('type', 'mid')
+                        )
+                        video.scenes.append(scene)
+                        
+            elif isinstance(scenes_result, list):
+                # 이전 버전 호환성
+                self.logger.warning("⚠️ 이전 버전의 씬 추출 결과 형식")
+                for scene_data in scenes_result[:10]:  # 최대 10개
+                    if isinstance(scene_data, Scene):
+                        video.scenes.append(scene_data)
+                    elif isinstance(scene_data, dict):
+                        scene = Scene(
+                            timestamp=scene_data.get('timestamp', 0.0),
+                            frame_path=scene_data.get('frame_path', '') or scene_data.get('path', ''),
+                            scene_type=scene_data.get('type', 'mid')
+                        )
+                        video.scenes.append(scene)
+                    elif isinstance(scene_data, str):
+                        scene = Scene(
+                            timestamp=0.0,
+                            frame_path=scene_data,
+                            scene_type='mid'
+                        )
+                        video.scenes.append(scene)
+
             update_progress("extract", 60, f"✅ {len(video.scenes)}개 씬 추출 완료")
             
             # 7. AI 분석
