@@ -189,16 +189,37 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             console_callback("📊 분석 결과 요약:")
             
             if video.metadata:
-                console_callback(f"  📹 제목: {video.metadata.title[:50]}...")
-                console_callback(f"  ⏱️ 길이: {video.metadata.duration//60}분 {video.metadata.duration%60}초")
-                console_callback(f"  👁️ 조회수: {video.metadata.view_count:,}회")
+                # 제목 - None 체크
+                if video.metadata.title:
+                    title = video.metadata.title[:50] + "..." if len(video.metadata.title) > 50 else video.metadata.title
+                    console_callback(f"  📹 제목: {title}")
+                
+                # 길이 - None 체크
+                if video.metadata.duration is not None and video.metadata.duration > 0:
+                    minutes = int(video.metadata.duration // 60)
+                    seconds = int(video.metadata.duration % 60)
+                    console_callback(f"  ⏱️ 길이: {minutes}분 {seconds}초")
+                
+                # 조회수 - None 체크
+                if video.metadata.view_count is not None:
+                    console_callback(f"  👁️ 조회수: {video.metadata.view_count:,}회")
+                elif hasattr(video.metadata, 'view_count'):
+                    console_callback(f"  👁️ 조회수: N/A")
             
             if video.analysis_result:
-                console_callback(f"  🎭 장르: {video.analysis_result.get('genre', 'Unknown')}")
-                console_callback(f"  🎨 표현형식: {video.analysis_result.get('expression_style', 'Unknown')}")
-                tags = video.analysis_result.get('tags', [])[:5]
+                # 장르 - None 체크
+                genre = video.analysis_result.get('genre', 'Unknown')
+                console_callback(f"  🎭 장르: {genre}")
+                
+                # 표현형식 - None 체크
+                expression = video.analysis_result.get('expression_style', 'Unknown')
+                console_callback(f"  🎨 표현형식: {expression}")
+                
+                # 태그 - None 체크
+                tags = video.analysis_result.get('tags', [])
                 if tags:
-                    console_callback(f"  🏷️ 주요 태그: {', '.join(tags)}")
+                    tag_list = tags[:5]  # 상위 5개만
+                    console_callback(f"  🏷️ 주요 태그: {', '.join(tag_list)}")
             
             console_callback("━" * 50)
             
