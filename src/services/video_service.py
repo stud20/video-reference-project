@@ -251,19 +251,34 @@ class VideoService:
             
             # Scene 객체로 변환
             video.scenes = []
+            grouped_scenes = []
             
-            # scenes_result 처리
+            
+            # scenes_result 처리 - 새로운 구조에 맞게
             if isinstance(scenes_result, dict):
-                if 'scenes' in scenes_result:
-                    scenes_list = scenes_result['scenes']
-                elif 'selected_images' in scenes_result:
-                    scenes_list = scenes_result['selected_images']
+                # all_scenes 처리 (전체 씬 저장)
+                all_scenes = scenes_result.get('all_scenes', [])
+                
+                # grouped_scenes 가져오기 (AI 분석용)
+                grouped_scenes = scenes_result.get('grouped_scenes', [])
+                
+                self.logger.info(f"📊 씬 추출 결과: 전체 {len(all_scenes)}개, 그룹화 {len(grouped_scenes)}개")
+                
+                # AI 분석을 위해 그룹화된 씬 사용
+                if grouped_scenes:
+                    video.scenes = grouped_scenes
+                    self.logger.info(f"✅ AI 분석을 위해 {len(grouped_scenes)}개의 그룹화된 씬 사용")
                 else:
-                    scenes_list = []
-            elif isinstance(scenes_result, list):
-                scenes_list = scenes_result
+                    # 그룹화된 씬이 없으면 전체 씬 사용
+                    video.scenes = all_scenes[:self.scene_extractor.target_scene_count]
+                    self.logger.warning(f"⚠️ 그룹화된 씬이 없어 전체 씬 중 {len(video.scenes)}개 사용")
+                    
             else:
-                scenes_list = []
+                # 기존 방식 호환성 유지
+                self.logger.warning("⚠️ 이전 버전의 씬 추출 결과 형식")
+                # 기존 코드 유지...
+
+            update_progress("extract", 60, f"✅ AI 분석용 씬 {len(video.scenes)}개 준비 완료")
             
             # 씬 데이터 처리
             scene_count = len(scenes_list)

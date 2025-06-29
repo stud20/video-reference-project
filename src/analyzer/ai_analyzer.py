@@ -634,13 +634,21 @@ A7. 예상 타겟 고객층"""
         self.logger.info(f"🖼️ 이미지 준비 시작: {len(selected_scenes)}개")
         
         for i, scene in enumerate(selected_scenes):
-            if not os.path.exists(scene.frame_path):
+            # 그룹화된 경로가 있으면 우선 사용
+            image_path = None
+            if hasattr(scene, 'grouped_path') and scene.grouped_path and os.path.exists(scene.grouped_path):
+                image_path = scene.grouped_path
+                self.logger.debug(f"그룹화된 이미지 사용: {image_path}")
+            elif os.path.exists(scene.frame_path):
+                image_path = scene.frame_path
+                self.logger.debug(f"원본 이미지 사용: {image_path}")
+            else:
                 self.logger.warning(f"이미지 파일 없음: {scene.frame_path}")
                 continue
             
             try:
                 # 이미지 읽기
-                with open(scene.frame_path, "rb") as f:
+                with open(image_path, "rb") as f:
                     image_data = base64.b64encode(f.read()).decode('utf-8')
                 
                 # 페이로드 생성
@@ -659,11 +667,10 @@ A7. 예상 타겟 고객층"""
                 self.logger.debug(f"✅ 이미지 {i+1} 준비 완료")
                 
             except Exception as e:
-                self.logger.error(f"이미지 로드 실패: {scene.frame_path} - {e}")
+                self.logger.error(f"이미지 로드 실패: {image_path} - {e}")
         
         self.logger.info(f"📸 {len(image_payloads)}개 이미지 준비 완료")
         return image_payloads
-
     
     def _prepare_thumbnail(self, video: Video) -> Optional[Dict]:
         """썸네일 이미지 준비"""

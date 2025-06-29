@@ -1,6 +1,8 @@
 # ===== 웹 프레임워크 =====
 streamlit>=1.28.0
 stqdm>=0.0.5
+streamlit-extras>=0.3.0
+streamlit-javascript>=0.1.5
 
 # ===== 영상 처리 및 다운로드 =====
 yt-dlp>=2023.10.13          # YouTube/Vimeo 다운로드
@@ -32,8 +34,3 @@ python-dateutil>=2.8.2      # 날짜/시간 처리
 # - macOS: brew install ffmpeg
 # - Ubuntu: sudo apt install ffmpeg
 # - Windows: https://ffmpeg.org/download.html
-
-
-
-streamlit-extras
-streamlit-javascript
