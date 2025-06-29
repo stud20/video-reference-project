@@ -117,7 +117,7 @@ def render_thumbnail(video: Dict[str, Any]):
     video_id = video.get('video_id', '')
     
     # 웹 서버 URL 설정
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     session_id = video_id  # video_id가 session_id와 동일
     
     # 썸네일 URL
@@ -367,7 +367,7 @@ def render_card_actions(video_id: str, video: Dict[str, Any]):
 
 def render_download_button(video_id: str, video: Dict[str, Any]):
     """다운로드 버튼 렌더링 - 향상된 로직"""
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     
     # 비디오 제목 가져오기
     video_title = video.get('title', 'video')

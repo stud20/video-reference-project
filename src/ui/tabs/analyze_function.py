@@ -38,7 +38,7 @@ def render_action_buttons(video):
         logger.error(f"Invalid video object - Type: {type(video)}, Attributes: {dir(video)}")
         return
     
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     video_id = video.session_id
     
     # 파일명 정리
@@ -165,7 +165,7 @@ def render_moodboard_section(video):
     # 무드보드 컨테이너
     with st.container():
         # 씬 정보 준비
-        base_url = "https://sof.greatminds.kr"
+        base_url = "https://ref.greatminds.kr"
         session_id = video.session_id
         
         # 재추론된 경우와 일반 분석 구분

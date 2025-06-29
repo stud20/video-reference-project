@@ -137,7 +137,7 @@ def render_film_strip(video):
     if not video.scenes:
         return
     
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     
     # session_id 가져오기
     if not hasattr(video, 'session_id'):

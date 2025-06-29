@@ -62,7 +62,7 @@ def get_video_with_scenes(video_id: str) -> Optional[Dict[str, Any]]:
 def render_scene_grid(video_id: str, video_data: Dict[str, Any]):
     """씬 이미지 그리드 렌더링"""
     # 웹 서버 URL 설정
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     session_id = video_id  # video_id가 session_id와 동일
     
     all_items = []

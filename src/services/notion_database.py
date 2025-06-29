@@ -204,7 +204,7 @@ class NotionDatabaseService(NotionBaseService):
             return ''
         
         # 자체 서버 URL 생성
-        base_url = "https://sof.greatminds.kr"
+        base_url = "https://ref.greatminds.kr"
         thumbnail_url = f"{base_url}/{session_id}/{session_id}_Thumbnail.jpg"
         
         logger.debug(f"🖼️ 썸네일 URL (자체 서버): {thumbnail_url}")

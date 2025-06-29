@@ -32,3 +32,8 @@ python-dateutil>=2.8.2      # 날짜/시간 처리
 # - macOS: brew install ffmpeg
 # - Ubuntu: sudo apt install ffmpeg
 # - Windows: https://ffmpeg.org/download.html
+
+
+
+streamlit-extras
+streamlit-javascript

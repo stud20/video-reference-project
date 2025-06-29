@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 def handle_video_download(video_id: str, video_data: Dict[str, Any]):
     """비디오 다운로드 처리"""
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     
     # 파일명 정리 함수
     def sanitize_filename(title: str, max_length: int = 100) -> str:

@@ -36,7 +36,7 @@ def render_reanalysis_section(video):
         st.session_state.selected_images_for_reanalysis = set()
     
     # 씬 정보 준비
-    base_url = "https://sof.greatminds.kr"
+    base_url = "https://ref.greatminds.kr"
     session_id = video.session_id
     all_scene_numbers = get_all_scene_numbers(video)
     
