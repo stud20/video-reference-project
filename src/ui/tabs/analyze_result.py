@@ -262,11 +262,13 @@ def render_analysis_results(video):
     with col1:
         # 제목
         st.markdown('<p class="result-subtitle">📹 제목</p>', unsafe_allow_html=True)
-        st.markdown(f'<div class="result-content">{metadata.title if metadata else "Unknown"}</div>', unsafe_allow_html=True)
+        title = metadata.title if metadata and metadata.title else "Unknown"
+        st.markdown(f'<div class="result-content">{title}</div>', unsafe_allow_html=True)
         
         # 업로드 채널
         st.markdown('<p class="result-subtitle">👤 업로드 채널</p>', unsafe_allow_html=True)
-        st.markdown(f'<div class="result-content">{metadata.uploader if metadata else "Unknown"}</div>', unsafe_allow_html=True)
+        uploader = metadata.uploader if metadata and metadata.uploader else "Unknown"
+        st.markdown(f'<div class="result-content">{uploader}</div>', unsafe_allow_html=True)
         
         # 설명
         if metadata and metadata.description:
@@ -279,16 +281,25 @@ def render_analysis_results(video):
         info_html = '<div class="result-content">'
         
         if metadata:
-            if metadata.view_count:
+            # view_count - None 체크
+            if metadata.view_count is not None and metadata.view_count > 0:
                 info_html += f'<div class="info-item">👁️ 조회수: <strong>{metadata.view_count:,}회</strong></div>'
-            if metadata.duration:
+            
+            # duration - None 체크
+            if metadata.duration is not None and metadata.duration > 0:
                 info_html += f'<div class="info-item">⏱️ 길이: <strong>{int(metadata.duration//60)}분 {int(metadata.duration%60)}초</strong></div>'
+            
+            # upload_date - None 체크
             if metadata.upload_date:
                 upload_date = metadata.upload_date[:10] if len(metadata.upload_date) >= 10 else metadata.upload_date
                 info_html += f'<div class="info-item">📅 업로드: <strong>{upload_date}</strong></div>'
-            if metadata.like_count:
+            
+            # like_count - None 체크
+            if metadata.like_count is not None and metadata.like_count > 0:
                 info_html += f'<div class="info-item">👍 좋아요: <strong>{metadata.like_count:,}</strong></div>'
-            if metadata.comment_count:
+            
+            # comment_count - None 체크
+            if metadata.comment_count is not None and metadata.comment_count > 0:
                 info_html += f'<div class="info-item">💬 댓글: <strong>{metadata.comment_count:,}</strong></div>'
         
         info_html += '</div>'
