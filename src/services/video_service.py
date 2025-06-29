@@ -28,6 +28,7 @@ class VideoService:
         Args:
             storage_type: 사용할 스토리지 타입
         """
+        self.logger = get_logger(__name__)
         self.downloader = YouTubeDownloader()
         self.scene_extractor = SceneExtractor()
         
