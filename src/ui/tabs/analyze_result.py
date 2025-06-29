@@ -160,9 +160,18 @@ def render_film_strip(video):
             caption += " (재선택됨)"
         st.image(thumbnail_url, caption=caption, use_container_width=True)
     
-    # 씬 이미지들
-    for i, scene in enumerate(video.grouped_scenes):
-        scene_filename = os.path.basename(scene.frame_path)
+    # 씬 이미지들 - grouped_scenes 대신 scenes 사용
+    for i, scene in enumerate(video.scenes):
+        # 그룹화된 이미지 경로 확인
+        if hasattr(scene, 'grouped_path') and scene.grouped_path:
+            # 그룹화된 이미지가 있는 경우
+            scene_filename = os.path.basename(scene.grouped_path)
+            logger.debug(f"Using grouped image: {scene_filename}")
+        else:
+            # 그룹화된 이미지가 없으면 원본 사용
+            scene_filename = os.path.basename(scene.frame_path)
+            logger.debug(f"Using original image: {scene_filename}")
+        
         scene_url = f"{base_url}/{video.session_id}/{scene_filename}"
         
         with film_grid.container():
@@ -171,6 +180,10 @@ def render_film_strip(video):
                 caption += f" ({scene.timestamp:.1f}s)"
             if is_reanalyzed:
                 caption += " ✅"
+            
+            # 그룹화된 씬인지 표시
+            if hasattr(scene, 'grouped_path') and scene.grouped_path:
+                caption += " 🎯"  # 그룹화된 씬 표시
                 
             st.image(
                 scene_url, 
