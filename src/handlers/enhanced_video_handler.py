@@ -12,14 +12,7 @@ logger = get_logger(__name__)
 
 
 def handle_video_analysis_enhanced(video_url: str, precision_level: int, console_callback: Callable):
-    """
-    향상된 비디오 분석 - 실시간 콘솔 출력 with 실제 VideoService
-    
-    Args:
-        video_url: 분석할 비디오 URL
-        precision_level: 정밀도 레벨 (1-10)
-        console_callback: 콘솔 업데이트 콜백 함수
-    """
+    """향상된 비디오 분석 - 실시간 콘솔 출력 with 실제 VideoService"""
     
     try:
         # VideoService 가져오기
@@ -223,19 +216,15 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             
             console_callback("━" * 50)
             
-            # Notion 업데이트 추가
+            # Notion 업데이트 부분 수정
             if video.analysis_result:
                 console_callback("📝 Notion 데이터베이스 업데이트 중...")
                 
                 try:
-                    from services.notion_service import NotionService
-                    from storage.db_manager import VideoAnalysisDB
+                    from src.services.notion_service import NotionService
+                    from src.storage.db_manager import VideoAnalysisDB
                     
-                    # NotionService가 이미 초기화되어 있는지 확인
-                    if hasattr(st.session_state, 'notion_service'):
-                        notion = st.session_state.notion_service
-                    else:
-                        notion = NotionService()
+                    notion = NotionService()
                     db = VideoAnalysisDB()
                     
                     # 영상 정보 가져오기
@@ -258,10 +247,10 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
                         
                 except ImportError:
                     console_callback("⚠️ Notion 서비스를 찾을 수 없습니다")
-                    logger.warning("Notion service not available")
+                    logger.warning("Notion service not available")  # 모듈 레벨 logger 사용
                 except Exception as e:
                     console_callback(f"⚠️ Notion 업데이트 중 오류: {str(e)}")
-                    logger.error(f"Notion update error: {str(e)}")
+                    logger.error(f"Notion update error: {str(e)}")  # 모듈 레벨 logger 사용
             
             console_callback("🎉 모든 처리가 완료되었습니다!")
         
