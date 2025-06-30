@@ -10,6 +10,9 @@ from notion_client import Client
 from notion_client.errors import APIResponseError
 from utils.logger import get_logger
 
+# logger를 모듈 레벨에서 정의
+logger = get_logger(__name__)
+
 
 class NotionBaseService:
     """Notion API 기본 서비스"""
