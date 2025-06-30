@@ -94,7 +94,7 @@ class VideoService:
         
         if self.auto_upload_to_notion:
             try:
-                from src.services.notion_service import NotionService
+                from services.notion_service import NotionService  # src. 제거
                 self.notion_service = NotionService()
                 self.logger.info("✅ Notion 서비스 초기화 성공 (자동 업로드 활성화)")
             except Exception as e:

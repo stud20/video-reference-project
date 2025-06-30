@@ -221,8 +221,8 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
                 console_callback("📝 Notion 데이터베이스 업데이트 중...")
                 
                 try:
-                    from src.services.notion_service import NotionService
-                    from src.storage.db_manager import VideoAnalysisDB
+                    from services.notion_service import NotionService
+                    from storage.db_manager import VideoAnalysisDB
                     
                     notion = NotionService()
                     db = VideoAnalysisDB()
