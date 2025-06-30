@@ -10,8 +10,6 @@ from notion_client import Client
 from notion_client.errors import APIResponseError
 from utils.logger import get_logger
 
-logger = get_logger(__name__)
-
 
 class NotionBaseService:
     """Notion API 기본 서비스"""
@@ -20,7 +18,8 @@ class NotionBaseService:
         """Notion 클라이언트 초기화"""
         self.api_key = os.getenv('NOTION_API_KEY')
         self.database_id = os.getenv('NOTION_DATABASE_ID')
-        
+        self.logger = get_logger(__name__)
+
         if not self.api_key:
             raise ValueError("NOTION_API_KEY 환경변수가 필요합니다.")
         

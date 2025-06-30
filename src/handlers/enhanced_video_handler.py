@@ -231,7 +231,11 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
                     from services.notion_service import NotionService
                     from storage.db_manager import VideoAnalysisDB
                     
-                    notion = NotionService()
+                    # NotionService가 이미 초기화되어 있는지 확인
+                    if hasattr(st.session_state, 'notion_service'):
+                        notion = st.session_state.notion_service
+                    else:
+                        notion = NotionService()
                     db = VideoAnalysisDB()
                     
                     # 영상 정보 가져오기

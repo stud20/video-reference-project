@@ -21,6 +21,7 @@ class NotionService:
         """서비스 초기화"""
         self.db_service = NotionDatabaseService()
         self.page_service = NotionPageService()
+        self.logger = get_logger(__name__)
         logger.info("Notion 통합 서비스 초기화 완료")
     
     def add_video_to_database(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
@@ -250,7 +251,7 @@ class NotionService:
         # None 값 필터링
         return {k: v for k, v in properties.items() if v is not None}
 
-            
+
 
     def bulk_add_to_database(self, 
                             videos_with_analysis: List[Tuple[Dict, Dict]], 
