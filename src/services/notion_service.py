@@ -67,31 +67,6 @@ class NotionService:
             self.logger.error(error_msg)
             return False, error_msg
 
-    def add_video_to_database(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
-        """Notion 데이터베이스에 비디오 추가 또는 업데이트"""
-        try:
-            video_id = video_data.get('video_id')
-            if not video_id:
-                return False, "video_id가 없습니다"
-            
-            # 기존 페이지 검색
-            existing_page = self._find_existing_page(video_id)
-            
-            if existing_page:
-                # 기존 페이지가 있으면 업데이트
-                self.logger.info(f"기존 페이지 발견: {existing_page['id']}")
-                return self._update_existing_page(existing_page['id'], video_data, analysis_data)
-            else:
-                # 새 페이지 생성
-                return self._create_new_page(video_data, analysis_data)
-                
-        except Exception as e:
-            error_msg = f"Notion 업로드 실패: {str(e)}"
-            self.logger.error(error_msg)
-            return False, error_msg
-
-
-
     def _update_existing_page(self, page_id: str, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
         """기존 페이지 업데이트"""
         try:
@@ -131,7 +106,6 @@ class NotionService:
             error_msg = f"페이지 생성 실패: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg
-
 
     def _create_properties(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Dict[str, Any]:
         """Notion 프로퍼티 생성 (공통 로직)"""
@@ -271,8 +245,6 @@ class NotionService:
         # None 값 필터링
         return {k: v for k, v in properties.items() if v is not None}
 
-
-
     def bulk_add_to_database(self, 
                             videos_with_analysis: List[Tuple[Dict, Dict]], 
                             progress_callback=None) -> Tuple[int, int, List[str]]:
@@ -323,9 +295,6 @@ class NotionService:
                 logger.error(f"추가 실패 - {error_msg}")
         
         return success_count, fail_count, errors
-    
-
-    # src/services/notion_service.py에 추가할 메서드들
 
     def find_video_blocks(self, video_id: str) -> List[str]:
         """
@@ -340,7 +309,7 @@ class NotionService:
         try:
             # 데이터베이스에서 video_id로 검색
             response = self.client.databases.query(
-                database_id=self.db_service.database_id,
+                database_id=self.database_id,
                 filter={
                     "property": "영상 ID",
                     "rich_text": {
@@ -371,7 +340,7 @@ class NotionService:
         """
         try:
             # 페이지 아카이브 (Notion API는 실제 삭제 대신 아카이브를 사용)
-            self.db_service.client.pages.update(
+            self.client.pages.update(
                 page_id=block_id,
                 archived=True
             )
@@ -412,7 +381,7 @@ class NotionService:
             
             # 3. 결과 반환
             if failed_count == 0:
-                return True, f"{deleted_count}삭제 완료"
+                return True, f"{deleted_count}개 삭제 완료"
             elif deleted_count > 0:
                 return False, f"{deleted_count}개 삭제, {failed_count}개 실패"
             else:
@@ -456,28 +425,6 @@ class NotionService:
         
         return success_count, fail_count, errors
 
-
-    # 데이터베이스 서비스 메서드들을 직접 노출
-    def search_videos(self, **kwargs):
-        """영상 검색"""
-        return self.db_service.search_videos(**kwargs)
-    
-    def test_connection(self):
-        """연결 테스트"""
-        return self.db_service.test_connection()
-    
-    def get_database_url(self):
-        """데이터베이스 URL 반환"""
-        return self.db_service.get_database_url()
-    
-    def get_database_properties(self):
-        """데이터베이스 프로퍼티 조회"""
-        return self.db_service.get_database_properties()
-    
-    def update_database_schema(self):
-        """데이터베이스 스키마 업데이트"""
-        return self.db_service.update_database_schema()
-
     def test_connection(self) -> bool:
         """Notion 연결 테스트"""
         try:
@@ -507,3 +454,71 @@ class NotionService:
         except Exception as e:
             self.logger.error(f"프로퍼티 조회 실패: {str(e)}")
             return {}
+
+    # 헬퍼 메서드들
+    def _find_existing_page(self, video_id: str) -> Optional[Dict[str, Any]]:
+        """기존 페이지 찾기"""
+        try:
+            response = self.client.databases.query(
+                database_id=self.database_id,
+                filter={
+                    "property": "영상 ID",
+                    "rich_text": {
+                        "equals": video_id
+                    }
+                }
+            )
+            
+            if response['results']:
+                return response['results'][0]
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"페이지 검색 오류: {str(e)}")
+            return None
+
+    def _get_platform_name(self, video_data: Dict[str, Any]) -> str:
+        """플랫폼 이름 추출"""
+        platform = video_data.get('platform', '').lower()
+        if 'youtube' in platform:
+            return 'YouTube'
+        elif 'vimeo' in platform:
+            return 'Vimeo'
+        return 'Unknown'
+
+    def _safe_get_text(self, text: str, max_length: int) -> str:
+        """텍스트 안전하게 자르기"""
+        if not text:
+            return ''
+        return text[:max_length]
+
+    def _get_language_name(self, language_code: str) -> str:
+        """언어 코드를 읽기 쉬운 이름으로 변환"""
+        language_map = {
+            'ko': '한국어',
+            'en': '영어',
+            'ja': '일본어',
+            'zh': '중국어',
+            'es': '스페인어',
+            'fr': '프랑스어',
+            'de': '독일어',
+        }
+        return language_map.get(language_code, language_code or 'Unknown')
+
+    def _prepare_media_files(self, video_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """미디어 파일 준비 (썸네일)"""
+        files = []
+        
+        # 자체 서버 썸네일 URL
+        video_id = video_data.get('video_id', '')
+        if video_id:
+            thumbnail_url = f"https://ref.greatminds.kr/{video_id}/{video_id}_Thumbnail.jpg"
+            files.append({
+                "type": "external",
+                "name": f"{video_id}_thumbnail.jpg",
+                "external": {
+                    "url": thumbnail_url
+                }
+            })
+        
+        return files
