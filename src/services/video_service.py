@@ -433,13 +433,13 @@ class VideoService:
                 try:
                     update_progress("notion", 96, "📝 Notion 데이터베이스에 업로드 중...")
                     
-                    # Video 객체에서 직접 데이터 생성 (DB를 거치지 않음!)
+                    # Video 객체에서 직접 데이터 생성
                     video_data_for_notion = {
                         'video_id': video.metadata.video_id,
                         'title': video.metadata.title,
                         'url': video.metadata.url,
                         'webpage_url': video.metadata.webpage_url,
-                        'thumbnail': video.metadata.thumbnail,  # 이것이 핵심!
+                        'thumbnail': video.metadata.thumbnail,
                         'platform': video.metadata.platform,
                         'duration': video.metadata.duration,
                         'uploader': video.metadata.uploader,
@@ -456,30 +456,21 @@ class VideoService:
                         'age_limit': video.metadata.age_limit,
                     }
                     
-                    # 디버깅
-                    logger.info(f"🔍 Notion으로 보낼 데이터:")
-                    logger.info(f"  - platform: {video_data_for_notion['platform']}")
-                    logger.info(f"  - thumbnail: {video_data_for_notion['thumbnail']}")
-                    logger.info(f"  - webpage_url: {video_data_for_notion['webpage_url']}")
-                    
-                    # 직접 호출 (DB를 거치지 않고!)
+                    # Notion 업로드 (업데이트 또는 생성)
                     success, result = self.notion_service.add_video_to_database(
                         video_data=video_data_for_notion,
                         analysis_data=video.analysis_result
                     )
                     
                     if success:
-                        update_progress("notion", 98, "✅ Notion 업로드 성공!")
-                        logger.info(f"Notion 페이지 ID: {result}")
-                        logger.info(f"Notion 데이터베이스 URL: {self.notion_service.get_database_url()}")
+                        update_progress("notion", 98, "✅ Notion 업로드/업데이트 성공!")
+                        logger.info(f"Notion 페이지: {result}")
                     else:
                         update_progress("notion", 98, f"⚠️ Notion 업로드 실패: {result}")
                         logger.warning(f"Notion 업로드 실패: {result}")
                     
                 except Exception as e:
                     logger.error(f"Notion 업로드 중 오류: {str(e)}")
-                    import traceback
-                    logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
                     update_progress("notion", 98, f"⚠️ Notion 업로드 오류: {str(e)}")
             
             # 10. 임시 파일 정리

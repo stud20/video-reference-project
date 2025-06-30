@@ -23,92 +23,235 @@ class NotionService:
         self.page_service = NotionPageService()
         logger.info("Notion 통합 서비스 초기화 완료")
     
-    def add_video_to_database(self, 
-                            video_data: Dict[str, Any], 
-                            analysis_data: Dict[str, Any],
-                            database_id: Optional[str] = None) -> Tuple[bool, str]:
-        """
-        영상 분석 결과를 Notion 데이터베이스에 추가하고 상세 페이지 생성
-        """
+    def add_video_to_database(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Notion 데이터베이스에 비디오 추가 또는 업데이트"""
         try:
-            # 데이터베이스 ID 확인
-            if database_id:
-                self.db_service.database_id = database_id
+            video_id = video_data.get('video_id')
+            if not video_id:
+                return False, "video_id가 없습니다"
             
-            video_id = video_data.get('video_id', 'Unknown')
-            logger.info(f"🔍 영상 처리 시작 - video_id: {video_id}")
+            # 기존 페이지 검색
+            existing_page = self._find_existing_page(video_id)
             
-            # 디버깅: 입력 데이터 확인
-            logger.debug(f"📊 video_data 키: {list(video_data.keys())}")
-            logger.debug(f"🌐 플랫폼: {video_data.get('platform')}")
-            logger.debug(f"🔗 URL: {video_data.get('url')}")
-            logger.debug(f"📄 webpage_url: {video_data.get('webpage_url')}")
-            logger.debug(f"🖼️ thumbnail: {video_data.get('thumbnail')}")
-            
-            # 중복 확인
-            existing_page = self.db_service.check_duplicate(video_id)
             if existing_page:
-                logger.info(f"기존 레코드 발견: {video_id}")
-                return self._update_existing_record(
-                    existing_page['id'], 
-                    video_data, 
-                    analysis_data
-                )
-            
-            # 데이터베이스 프로퍼티 생성
-            properties = self.db_service.create_database_properties(video_data, analysis_data)
-            
-            # 페이지 내용 생성
-            page_content = self.page_service.create_page_content(video_data, analysis_data)
-            
-            # 페이지 생성 (프로퍼티 + 내용)
-            success, result = self.db_service.create_page(properties, page_content)
-            
-            if success:
-                logger.info(f"✅ Notion 페이지 생성 성공: {result}")
+                # 기존 페이지가 있으면 업데이트
+                self.logger.info(f"기존 페이지 발견: {existing_page['id']}")
+                return self._update_existing_page(existing_page['id'], video_data, analysis_data)
             else:
-                logger.error(f"❌ Notion 페이지 생성 실패: {result}")
-            
-            return success, result
-            
+                # 새 페이지 생성
+                return self._create_new_page(video_data, analysis_data)
+                
         except Exception as e:
-            error_msg = f"추가 중 오류: {str(e)}"
-            logger.error(f"{error_msg} - Video ID: {video_data.get('video_id', 'Unknown')}")
-            logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
+            error_msg = f"Notion 업로드 실패: {str(e)}"
+            self.logger.error(error_msg)
             return False, error_msg
 
-    
-    def _update_existing_record(self, 
-                               page_id: str, 
-                               video_data: Dict[str, Any], 
-                               analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
-        """기존 레코드 업데이트 (프로퍼티 + 페이지 내용)"""
+    def add_video_to_database(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Notion 데이터베이스에 비디오 추가 또는 업데이트"""
         try:
-            # 프로퍼티 업데이트
-            properties = self.db_service.create_database_properties(video_data, analysis_data)
-            success, result = self.db_service.update_page(page_id, properties)
+            video_id = video_data.get('video_id')
+            if not video_id:
+                return False, "video_id가 없습니다"
             
-            if not success:
-                return False, result
+            # 기존 페이지 검색
+            existing_page = self._find_existing_page(video_id)
             
-            # 페이지 내용 업데이트
-            content_updated = self.page_service.update_page_content(
-                page_id, 
-                video_data, 
-                analysis_data
+            if existing_page:
+                # 기존 페이지가 있으면 업데이트
+                self.logger.info(f"기존 페이지 발견: {existing_page['id']}")
+                return self._update_existing_page(existing_page['id'], video_data, analysis_data)
+            else:
+                # 새 페이지 생성
+                return self._create_new_page(video_data, analysis_data)
+                
+        except Exception as e:
+            error_msg = f"Notion 업로드 실패: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
+
+
+
+    def _update_existing_page(self, page_id: str, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """기존 페이지 업데이트"""
+        try:
+            # 프로퍼티 생성 (새 페이지와 동일)
+            properties = self._create_properties(video_data, analysis_data)
+            
+            # 페이지 업데이트
+            response = self.notion.pages.update(
+                page_id=page_id,
+                properties=properties
             )
             
-            if content_updated:
-                logger.info(f"기존 레코드 업데이트 완료: {video_data['video_id']}")
-                return True, f"업데이트됨: {page_id}"
-            else:
-                return True, f"프로퍼티만 업데이트됨: {page_id}"
+            self.logger.info(f"✅ Notion 페이지 업데이트 성공: {page_id}")
+            return True, page_id
             
         except Exception as e:
-            error_msg = f"업데이트 오류: {str(e)}"
-            logger.error(error_msg)
+            error_msg = f"페이지 업데이트 실패: {str(e)}"
+            self.logger.error(error_msg)
             return False, error_msg
-    
+
+    def _create_new_page(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """새 페이지 생성"""
+        try:
+            properties = self._create_properties(video_data, analysis_data)
+            
+            # 페이지 생성
+            response = self.notion.pages.create(
+                parent={"database_id": self.database_id},
+                properties=properties
+            )
+            
+            page_id = response.get('id', '')
+            self.logger.info(f"✅ Notion 페이지 생성 성공: {page_id}")
+            return True, page_id
+            
+        except Exception as e:
+            error_msg = f"페이지 생성 실패: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
+
+
+    def _create_properties(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Notion 프로퍼티 생성 (공통 로직)"""
+        
+        # 디버깅: 받은 데이터 확인
+        self.logger.debug(f"video_data keys: {list(video_data.keys())}")
+        self.logger.debug(f"analysis_data keys: {list(analysis_data.keys())}")
+        
+        # 날짜 포맷 처리
+        analyzed_at = analysis_data.get('analysis_date', datetime.now().isoformat())
+        if isinstance(analyzed_at, str) and len(analyzed_at) >= 10:
+            analyzed_date = analyzed_at[:10]  # YYYY-MM-DD 형식만 추출
+        else:
+            analyzed_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # 프로퍼티 생성
+        properties = {
+            "특징": {
+                "title": [{
+                    "text": {
+                        "content": video_data.get('title', 'Untitled')[:100]
+                    }
+                }]
+            },
+            "영상 ID": {
+                "rich_text": [{
+                    "text": {
+                        "content": video_data.get('video_id', '')
+                    }
+                }]
+            },
+            "URL": {
+                "url": video_data.get('url', '')
+            },
+            "길이(초)": {
+                "number": video_data.get('duration', 0)
+            },
+            "플랫폼": {
+                "select": {
+                    "name": self._get_platform_name(video_data)
+                }
+            },
+            "태그 고객층": {
+                "multi_select": [
+                    {"name": tag[:25]} for tag in analysis_data.get('tags', [])[:10]
+                ]
+            },
+            "분위기": {
+                "rich_text": [{
+                    "text": {
+                        "content": self._safe_get_text(analysis_data.get('mood_tone', ''), 500)
+                    }
+                }]
+            },
+            "장르": {
+                "select": {
+                    "name": analysis_data.get('genre', 'Unknown')[:25]
+                }
+            },
+            "태그": {
+                "rich_text": [{
+                    "text": {
+                        "content": ', '.join(analysis_data.get('tags', []))[:2000]
+                    }
+                }]
+            },
+            "판단 이유": {
+                "rich_text": [{
+                    "text": {
+                        "content": self._safe_get_text(analysis_data.get('reasoning', ''), 2000)
+                    }
+                }]
+            },
+            "남부탁": {
+                "rich_text": [{
+                    "text": {
+                        "content": self._safe_get_text(analysis_data.get('features', ''), 2000)
+                    }
+                }]
+            },
+            "씬넬일": {
+                "rich_text": [{
+                    "text": {
+                        "content": analysis_data.get('expression_style', '')[:100]
+                    }
+                }]
+            },
+            "카테고리": {
+                "multi_select": [
+                    {"name": cat[:25]} for cat in video_data.get('categories', [])[:5]
+                ]
+            },
+            "제목": {
+                "rich_text": [{
+                    "text": {
+                        "content": video_data.get('title', '')[:500]
+                    }
+                }]
+            },
+            "채널": {
+                "rich_text": [{
+                    "text": {
+                        "content": video_data.get('channel', video_data.get('uploader', ''))[:100]
+                    }
+                }]
+            },
+            "미디어": {
+                "files": self._prepare_media_files(video_data)
+            },
+            "AI 분석 완료": {
+                "checkbox": True
+            },
+            "요약 정리 완료": {
+                "checkbox": False
+            },
+            "언어": {
+                "select": {
+                    "name": self._get_language_name(video_data.get('language', ''))
+                }
+            },
+            "조회수": {
+                "number": video_data.get('view_count', 0) or 0
+            },
+            "좋아요": {
+                "number": video_data.get('like_count', 0) or 0
+            },
+            "댓글수": {
+                "number": video_data.get('comment_count', 0) or 0
+            },
+            "분석일": {
+                "date": {
+                    "start": analyzed_date
+                }
+            }
+        }
+        
+        # None 값 필터링
+        return {k: v for k, v in properties.items() if v is not None}
+
+            
+
     def bulk_add_to_database(self, 
                             videos_with_analysis: List[Tuple[Dict, Dict]], 
                             progress_callback=None) -> Tuple[int, int, List[str]]:
