@@ -4,11 +4,10 @@ Notion API 통합 서비스
 데이터베이스와 페이지 기능을 통합하여 제공
 """
 
+import os
 from typing import Dict, Any, List, Optional, Tuple
-import time
-import traceback
-from .notion_database import NotionDatabaseService
-from .notion_page import NotionPageService
+from datetime import datetime
+from notion_client import Client
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,13 +15,32 @@ logger = get_logger(__name__)
 
 class NotionService:
     """Notion 통합 서비스"""
-    
+        
     def __init__(self):
-        """서비스 초기화"""
-        self.db_service = NotionDatabaseService()
-        self.page_service = NotionPageService()
+        """NotionService 초기화"""
+        import os
+        from notion_client import Client
+        
+        # 환경변수 체크
+        api_key = os.getenv("NOTION_API_KEY")
+        database_id = os.getenv("NOTION_DATABASE_ID")
+        
+        if not api_key:
+            raise ValueError("NOTION_API_KEY 환경변수가 설정되지 않았습니다.")
+        
+        if not database_id:
+            raise ValueError("NOTION_DATABASE_ID 환경변수가 설정되지 않았습니다.")
+        
+        # 속성 설정
+        self.api_key = api_key
+        self.database_id = database_id
         self.logger = get_logger(__name__)
-        logger.info("Notion 통합 서비스 초기화 완료")
+        
+        # Notion 클라이언트 초기화
+        self.client = Client(auth=self.api_key)
+        self.notion = self.client  # 호환성을 위해 둘 다 설정
+        
+        self.logger.info("NotionService 초기화 완료")
     
     def add_video_to_database(self, video_data: Dict[str, Any], analysis_data: Dict[str, Any]) -> Tuple[bool, str]:
         """Notion 데이터베이스에 비디오 추가 또는 업데이트"""
@@ -748,3 +766,71 @@ class NotionService:
         except Exception as e:
             logger.error(f"페이지 정보 가져오기 실패: {str(e)}")
             return None
+
+
+    def _find_existing_page(self, video_id: str) -> Optional[Dict[str, Any]]:
+        """기존 페이지 찾기"""
+        try:
+            response = self.client.databases.query(
+                database_id=self.database_id,
+                filter={
+                    "property": "영상 ID",
+                    "rich_text": {
+                        "equals": video_id
+                    }
+                }
+            )
+            
+            if response['results']:
+                return response['results'][0]
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"페이지 검색 오류: {str(e)}")
+            return None
+
+    def _get_platform_name(self, video_data: Dict[str, Any]) -> str:
+        """플랫폼 이름 추출"""
+        platform = video_data.get('platform', '').lower()
+        if 'youtube' in platform:
+            return 'YouTube'
+        elif 'vimeo' in platform:
+            return 'Vimeo'
+        return 'Unknown'
+
+    def _safe_get_text(self, text: str, max_length: int) -> str:
+        """텍스트 안전하게 자르기"""
+        if not text:
+            return ''
+        return text[:max_length]
+
+    def _get_language_name(self, language_code: str) -> str:
+        """언어 코드를 읽기 쉬운 이름으로 변환"""
+        language_map = {
+            'ko': '한국어',
+            'en': '영어',
+            'ja': '일본어',
+            'zh': '중국어',
+            'es': '스페인어',
+            'fr': '프랑스어',
+            'de': '독일어',
+        }
+        return language_map.get(language_code, language_code or 'Unknown')
+
+    def _prepare_media_files(self, video_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """미디어 파일 준비 (썸네일)"""
+        files = []
+        
+        # 자체 서버 썸네일 URL
+        video_id = video_data.get('video_id', '')
+        if video_id:
+            thumbnail_url = f"https://ref.greatminds.kr/{video_id}/{video_id}_Thumbnail.jpg"
+            files.append({
+                "type": "external",
+                "name": f"{video_id}_thumbnail.jpg",
+                "external": {
+                    "url": thumbnail_url
+                }
+            })
+        
+        return files
