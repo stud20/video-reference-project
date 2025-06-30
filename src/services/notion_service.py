@@ -114,16 +114,10 @@ class NotionService:
         self.logger.debug(f"video_data keys: {list(video_data.keys())}")
         self.logger.debug(f"analysis_data keys: {list(analysis_data.keys())}")
         
-        # 날짜 포맷 처리
-        analyzed_at = analysis_data.get('analysis_date', datetime.now().isoformat())
-        if isinstance(analyzed_at, str) and len(analyzed_at) >= 10:
-            analyzed_date = analyzed_at[:10]  # YYYY-MM-DD 형식만 추출
-        else:
-            analyzed_date = datetime.now().strftime('%Y-%m-%d')
-        
         # 프로퍼티 생성
         properties = {
-            "특징": {
+            # 기본 정보
+            "제목": {
                 "title": [{
                     "text": {
                         "content": video_data.get('title', 'Untitled')[:100]
@@ -140,38 +134,64 @@ class NotionService:
             "URL": {
                 "url": video_data.get('url', '')
             },
-            "길이(초)": {
-                "number": video_data.get('duration', 0)
+            "썸네일": {
+                "files": self._prepare_media_files(video_data)
             },
             "플랫폼": {
                 "select": {
                     "name": self._get_platform_name(video_data)
                 }
             },
-            "태그 고객층": {
-                "multi_select": [
-                    {"name": tag[:25]} for tag in analysis_data.get('tags', [])[:10]
-                ]
+            "업로더": {
+                "rich_text": [{
+                    "text": {
+                        "content": video_data.get('uploader', video_data.get('channel', 'Unknown'))[:100]
+                    }
+                }]
+            },
+            "길이(초)": {
+                "number": video_data.get('duration', 0) or 0
+            },
+            
+            # AI 분석 결과
+            "장르": {
+                "select": {
+                    "name": analysis_data.get('genre', 'Unknown')[:100]
+                }
+            },
+            "표현형식": {
+                "select": {
+                    "name": analysis_data.get('expression_style', '실사')[:100]
+                }
             },
             "분위기": {
                 "rich_text": [{
                     "text": {
-                        "content": self._safe_get_text(analysis_data.get('mood_tone', ''), 500)
+                        "content": self._safe_get_text(analysis_data.get('mood_tone', ''), 2000)
                     }
                 }]
             },
-            "장르": {
-                "select": {
-                    "name": analysis_data.get('genre', 'Unknown')[:25]
-                }
-            },
-            "태그": {
+            "타겟 고객층": {
                 "rich_text": [{
                     "text": {
-                        "content": ', '.join(analysis_data.get('tags', []))[:2000]
+                        "content": self._safe_get_text(analysis_data.get('target_audience', ''), 2000)
                     }
                 }]
             },
+            
+            # 태그 (통합)
+            "태그": {
+                "multi_select": [
+                    {"name": tag[:100]} for tag in analysis_data.get('tags', [])[:100]
+                ]
+            },
+            
+            # AI 분석 정보
+            "AI 분석 완료": {
+                "checkbox": True if analysis_data else False
+            },
+            
+            # 상세 내용
             "판단 이유": {
                 "rich_text": [{
                     "text": {
@@ -179,71 +199,52 @@ class NotionService:
                     }
                 }]
             },
-            "남부탁": {
+            "특징": {
                 "rich_text": [{
                     "text": {
                         "content": self._safe_get_text(analysis_data.get('features', ''), 2000)
                     }
                 }]
             },
-            "씬넬일": {
+            "설명": {
                 "rich_text": [{
                     "text": {
-                        "content": analysis_data.get('expression_style', '')[:100]
+                        "content": self._safe_get_text(video_data.get('description', ''), 2000)
+                    }
+                }]
+            },
+            
+            # 기타
+            "언어": {
+                "rich_text": [{
+                    "text": {
+                        "content": video_data.get('language', '')[:50]
                     }
                 }]
             },
             "카테고리": {
                 "multi_select": [
-                    {"name": cat[:25]} for cat in video_data.get('categories', [])[:5]
+                    {"name": cat[:100]} for cat in video_data.get('categories', [])[:100]
                 ]
-            },
-            "제목": {
-                "rich_text": [{
-                    "text": {
-                        "content": video_data.get('title', '')[:500]
-                    }
-                }]
-            },
-            "채널": {
-                "rich_text": [{
-                    "text": {
-                        "content": video_data.get('channel', video_data.get('uploader', ''))[:100]
-                    }
-                }]
-            },
-            "미디어": {
-                "files": self._prepare_media_files(video_data)
-            },
-            "AI 분석 완료": {
-                "checkbox": True
-            },
-            "요약 정리 완료": {
-                "checkbox": False
-            },
-            "언어": {
-                "select": {
-                    "name": self._get_language_name(video_data.get('language', ''))
-                }
-            },
-            "조회수": {
-                "number": video_data.get('view_count', 0) or 0
-            },
-            "좋아요": {
-                "number": video_data.get('like_count', 0) or 0
-            },
-            "댓글수": {
-                "number": video_data.get('comment_count', 0) or 0
-            },
-            "분석일": {
-                "date": {
-                    "start": analyzed_date
-                }
             }
         }
         
         # None 값 필터링
-        return {k: v for k, v in properties.items() if v is not None}
+        filtered_properties = {}
+        for key, value in properties.items():
+            if value is not None:
+                # multi_select의 경우 빈 리스트 체크
+                if key in ["태그", "카테고리"] and isinstance(value.get("multi_select"), list):
+                    if len(value["multi_select"]) > 0:
+                        filtered_properties[key] = value
+                # files의 경우 빈 리스트 체크
+                elif key == "썸네일" and isinstance(value.get("files"), list):
+                    if len(value["files"]) > 0:
+                        filtered_properties[key] = value
+                else:
+                    filtered_properties[key] = value
+        
+        return filtered_properties
 
     def bulk_add_to_database(self, 
                             videos_with_analysis: List[Tuple[Dict, Dict]], 
