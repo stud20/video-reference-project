@@ -3,6 +3,7 @@
 import paramiko
 import os
 import time
+import stat  # stat 모듈을 직접 import
 from typing import Optional
 from config.settings import Settings
 from utils.logger import get_logger
@@ -15,13 +16,13 @@ class SFTPStorage:
         self.logger = get_logger(__name__)
         
         # .env에서 SFTP 설정 로드
-        self.host = os.getenv("SFTP_HOST")
+        self.host = os.getenv("SYNOLOGY_HOST")
         self.port = int(os.getenv("SFTP_PORT", "22"))
-        self.username = os.getenv("SFTP_USER")
-        self.password = os.getenv("SFTP_PASS")
+        self.username = os.getenv("SYNOLOGY_USER")
+        self.password = os.getenv("SYNOLOGY_PASS")
         
         # WebDAV와 동일한 기본 경로 사용
-        self.base_path = os.getenv("SFTP_ROOT", "/dav/videoRef").rstrip('/')
+        self.base_path = os.getenv("WEBDAV_ROOT", "/dav/videoRef").rstrip('/')
         
         # 설정 검증
         self._validate_config()
@@ -31,11 +32,11 @@ class SFTPStorage:
         missing_configs = []
         
         if not self.host:
-            missing_configs.append("SFTP_HOST")
+            missing_configs.append("SYNOLOGY_HOST")
         if not self.username:
-            missing_configs.append("SFTP_USER")
+            missing_configs.append("SYNOLOGY_USER")
         if not self.password:
-            missing_configs.append("SFTP_PASS")
+            missing_configs.append("SYNOLOGY_PASS")
             
         if missing_configs:
             error_msg = f"필수 SFTP 설정이 누락되었습니다: {', '.join(missing_configs)}"
@@ -49,8 +50,8 @@ class SFTPStorage:
         self.logger.info(f"  - User: {self.username}")
         self.logger.info(f"  - Base Path: {self.base_path}")
         
-    def upload_file(self, local_path: str, remote_path: str) -> str:
-        """SFTP로 파일 업로드 - 개선된 버전"""
+    def upload_file(self, local_path: str, remote_path: str) -> bool:
+        """SFTP로 파일 업로드 - storage_manager와 호환되는 버전"""
         transport = None
         sftp = None
         
@@ -94,7 +95,7 @@ class SFTPStorage:
                 try:
                     sftp.stat(full_remote_path)
                     self.logger.info(f"파일이 이미 존재함: {full_remote_path}")
-                    return full_remote_path
+                    return True  # storage_manager와 호환을 위해 bool 반환
                 except IOError:
                     # 파일이 없으면 계속 진행
                     pass
@@ -123,7 +124,7 @@ class SFTPStorage:
                 sftp.rename(temp_remote_path, full_remote_path)
                 
                 self.logger.info(f"✅ SFTP 업로드 완료: {full_remote_path}")
-                return full_remote_path
+                return True  # 성공
                 
             except Exception as e:
                 self.logger.error(f"❌ SFTP 업로드 실패 (시도 {attempt + 1}): {e}")
@@ -146,7 +147,7 @@ class SFTPStorage:
                         transport.close()
                     continue
                 else:
-                    raise
+                    return False  # 실패
                     
             finally:
                 # 성공한 경우에만 연결 종료
@@ -157,10 +158,10 @@ class SFTPStorage:
                         transport.close()
         
         # 모든 재시도 실패
-        raise Exception(f"업로드 실패: {max_retries}번 시도 후 포기")
+        return False
     
     def _mkdir_p(self, sftp, remote_directory):
-        """원격 디렉토리 재귀적 생성 - 개선된 버전"""
+        """원격 디렉토리 재귀적 생성 - 수정된 버전"""
         if remote_directory == '/' or remote_directory == '':
             return
         
@@ -170,9 +171,9 @@ class SFTPStorage:
         
         # 이미 존재하는지 확인
         try:
-            attr = sftp.stat(remote_directory)
-            # 파일이 아닌 디렉토리인지 확인
-            if not paramiko.stat.S_ISDIR(attr.st_mode):
+            file_attr = sftp.stat(remote_directory)
+            # stat 모듈을 직접 사용
+            if not stat.S_ISDIR(file_attr.st_mode):
                 raise Exception(f"경로가 파일입니다: {remote_directory}")
             return
         except IOError:
@@ -190,7 +191,7 @@ class SFTPStorage:
             self.logger.info(f"📁 디렉토리 생성: {remote_directory}")
         except IOError as e:
             # 이미 존재하는 경우 무시
-            if "File exists" not in str(e):
+            if "File exists" not in str(e) and "Failure" not in str(e):
                 raise
     
     def test_connection(self) -> bool:
@@ -200,6 +201,10 @@ class SFTPStorage:
         
         try:
             self.logger.info(f"🔌 SFTP 연결 테스트: {self.host}:{self.port}")
+            
+            # 연결 디버깅을 위한 추가 로깅
+            self.logger.debug(f"연결 정보 - Host: {self.host}, Port: {self.port}, User: {self.username}")
+            
             transport = paramiko.Transport((self.host, self.port))
             transport.connect(username=self.username, password=self.password)
             
@@ -217,34 +222,19 @@ class SFTPStorage:
             self.logger.info("✅ SFTP 연결 테스트 성공")
             return True
             
+        except paramiko.AuthenticationException as e:
+            self.logger.error(f"❌ SFTP 인증 실패: {e}")
+            self.logger.error("사용자명과 비밀번호를 확인해주세요.")
+            return False
+        except paramiko.SSHException as e:
+            self.logger.error(f"❌ SSH 연결 오류: {e}")
+            return False
         except Exception as e:
             self.logger.error(f"❌ SFTP 연결 테스트 실패: {e}")
+            self.logger.error(f"오류 타입: {type(e).__name__}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return False
-            
-        finally:
-            if sftp:
-                sftp.close()
-            if transport:
-                transport.close()
-    
-    def list_files(self, remote_path: str = "") -> list:
-        """원격 디렉토리의 파일 목록 조회"""
-        transport = None
-        sftp = None
-        
-        try:
-            transport = paramiko.Transport((self.host, self.port))
-            transport.connect(username=self.username, password=self.password)
-            sftp = paramiko.SFTPClient.from_transport(transport)
-            
-            full_path = f"{self.base_path}/{remote_path}" if remote_path else self.base_path
-            files = sftp.listdir(full_path)
-            
-            return files
-            
-        except Exception as e:
-            self.logger.error(f"파일 목록 조회 실패: {e}")
-            return []
             
         finally:
             if sftp:
