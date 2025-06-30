@@ -21,14 +21,34 @@ logger = get_logger(__name__)
 class VideoService:
     """영상 처리 및 분석을 위한 메인 서비스 클래스"""
     
-    def __init__(self, storage_type: StorageType = StorageType.SFTP):
+    def __init__(self, storage_type: Optional[StorageType] = None):
         """
         VideoService 초기화
         
         Args:
-            storage_type: 사용할 스토리지 타입
+            storage_type: 사용할 스토리지 타입 (None이면 환경변수에서 읽음)
         """
         self.logger = get_logger(__name__)
+        
+        # 스토리지 타입 결정
+        if storage_type is None:
+            # 환경변수에서 읽기
+            storage_type_str = os.getenv("STORAGE_TYPE", "local").lower()
+            self.logger.info(f"🔍 환경변수 STORAGE_TYPE: {storage_type_str}")
+            
+            if storage_type_str == "sftp":
+                storage_type = StorageType.SFTP
+                self.logger.info("📡 SFTP 스토리지 모드로 설정")
+            elif storage_type_str == "local":
+                storage_type = StorageType.LOCAL
+                self.logger.info("💾 로컬 스토리지 모드로 설정")
+            else:
+                self.logger.warning(f"⚠️ 알 수 없는 스토리지 타입: {storage_type_str}")
+                self.logger.warning("💾 기본값으로 로컬 스토리지 사용")
+                storage_type = StorageType.LOCAL
+        else:
+            self.logger.info(f"🎯 명시적 스토리지 타입 설정: {storage_type.value}")
+        
         self.downloader = YouTubeDownloader()
         self.scene_extractor = SceneExtractor()
         
@@ -40,17 +60,32 @@ class VideoService:
             try:
                 from src.analyzer.ai_analyzer import AIAnalyzer
                 self.ai_analyzer = AIAnalyzer(api_key=openai_api_key)
-                logger.info("✅ AI 분석기 초기화 성공")
+                self.logger.info("✅ AI 분석기 초기화 성공")
             except Exception as e:
-                logger.error(f"❌ AI 분석기 초기화 실패: {str(e)}")
-                logger.error(f"❌ 오류 타입: {type(e).__name__}")
+                self.logger.error(f"❌ AI 분석기 초기화 실패: {str(e)}")
+                self.logger.error(f"❌ 오류 타입: {type(e).__name__}")
                 import traceback
-                logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
+                self.logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
                 self.ai_analyzer = None
         else:
-            logger.warning("⚠️ OpenAI API 키가 설정되지 않음")
+            self.logger.warning("⚠️ OpenAI API 키가 설정되지 않음")
         
+        # 스토리지 매니저 초기화
+        self.logger.info(f"🗄️ StorageManager 초기화 시작 - 타입: {storage_type.value}")
         self.storage_manager = StorageManager(storage_type)
+        
+        # 스토리지 연결 테스트
+        if storage_type == StorageType.SFTP:
+            self.logger.info("🔌 SFTP 연결 테스트 시작...")
+            if self.storage_manager.test_connection():
+                self.logger.info("✅ SFTP 연결 테스트 성공")
+            else:
+                self.logger.error("❌ SFTP 연결 테스트 실패")
+                self.logger.warning("⚠️ 로컬 스토리지로 전환합니다")
+                # SFTP 실패 시 로컬로 폴백
+                storage_type = StorageType.LOCAL
+                self.storage_manager = StorageManager(storage_type)
+        
         self.db = VideoAnalysisDB()  # TinyDB 매니저 추가
         
         # Notion 서비스 초기화 (옵션)
@@ -61,14 +96,19 @@ class VideoService:
             try:
                 from src.services.notion_service import NotionService
                 self.notion_service = NotionService()
-                logger.info("✅ Notion 서비스 초기화 성공 (자동 업로드 활성화)")
+                self.logger.info("✅ Notion 서비스 초기화 성공 (자동 업로드 활성화)")
             except Exception as e:
-                logger.warning(f"⚠️ Notion 서비스 초기화 실패: {str(e)}")
-                logger.warning("⚠️ 자동 Notion 업로드가 비활성화됩니다.")
+                self.logger.warning(f"⚠️ Notion 서비스 초기화 실패: {str(e)}")
+                self.logger.warning("⚠️ 자동 Notion 업로드가 비활성화됩니다.")
                 self.notion_service = None
         
-        logger.info(f"VideoService 초기화 완료 - Storage: {storage_type.value}, AI: {'활성화' if self.ai_analyzer else '비활성화'}, Notion: {'활성화' if self.notion_service else '비활성화'}")
-    
+        # 최종 상태 로그
+        self.logger.info("=" * 60)
+        self.logger.info("📊 VideoService 초기화 완료")
+        self.logger.info(f"  - Storage: {storage_type.value.upper()}")
+        self.logger.info(f"  - AI 분석: {'✅ 활성화' if self.ai_analyzer else '❌ 비활성화'}")
+        self.logger.info(f"  - Notion: {'✅ 활성화' if self.notion_service else '❌ 비활성화'}")
+        self.logger.info("=" * 60)
     def _parse_video_url(self, url: str) -> Tuple[str, str]:
         """
         URL에서 플랫폼과 비디오 ID 추출

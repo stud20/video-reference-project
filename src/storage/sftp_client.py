@@ -16,10 +16,10 @@ class SFTPStorage:
         self.logger = get_logger(__name__)
         
         # .env에서 SFTP 설정 로드
-        self.host = os.getenv("SYNOLOGY_HOST")
+        self.host = os.getenv("SFTP_HOST")
         self.port = int(os.getenv("SFTP_PORT", "22"))
-        self.username = os.getenv("SYNOLOGY_USER")
-        self.password = os.getenv("SYNOLOGY_PASS")
+        self.username = os.getenv("SFTP_USER")
+        self.password = os.getenv("SFTP_PASS")
         
         # WebDAV와 동일한 기본 경로 사용
         self.base_path = os.getenv("WEBDAV_ROOT", "/dav/videoRef").rstrip('/')
@@ -32,11 +32,11 @@ class SFTPStorage:
         missing_configs = []
         
         if not self.host:
-            missing_configs.append("SYNOLOGY_HOST")
+            missing_configs.append("SFTP_HOST")
         if not self.username:
-            missing_configs.append("SYNOLOGY_USER")
+            missing_configs.append("SFTP_USER")
         if not self.password:
-            missing_configs.append("SYNOLOGY_PASS")
+            missing_configs.append("SFTP_PASS")
             
         if missing_configs:
             error_msg = f"필수 SFTP 설정이 누락되었습니다: {', '.join(missing_configs)}"
