@@ -45,7 +45,7 @@ YouTube와 Vimeo의 광고 영상을 자동으로 분석하여 장르, 특징, �
 - 최소 4GB RAM
 - OpenAI API 키 (GPT-4 Vision 접근 권한 필요)
 
-
+a
 # 프로젝트 디렉토리 구조 (현재 실제 구조)
 
 ```
