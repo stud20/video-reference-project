@@ -1,508 +1,448 @@
 # src/ui/tabs/analyze_function_recom.py
 """
-재추론 기능 모듈
+재추론 기능 - 멀티 모델 지원
 """
 
 import streamlit as st
 import os
-from typing import List, Set
-from ui.styles import get_enhanced_styles
-from storage.db_manager import VideoAnalysisDB
+from typing import Dict, Any, Optional
+from datetime import datetime
+
+from src.analyzer.multi_model_analyzer import multi_model_analyzer, ModelComparisonResult
+from src.models.video import Video
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
-def render_reanalysis_section(video):
+def render_reanalysis_section(video: Video):
     """재추론 섹션 렌더링"""
-    if not st.session_state.get('show_reanalysis', False):
+    if not video:
+        st.error("❌ 분석 결과가 없습니다.")
         return
     
-    # 디버깅: video 타입 확인
-    logger.info(f"render_reanalysis_section - video type: {type(video)}")
+    st.markdown("### 🔄 AI 모델 재추론")
+    st.markdown("다른 AI 모델로 재분석하여 다양한 관점의 결과를 비교해보세요.")
     
-    # video 객체 검증
-    if not video or not hasattr(video, 'session_id'):
-        st.error("재추론을 위한 올바른 비디오 정보가 없습니다.")
-        logger.error(f"Invalid video object for reanalysis: {type(video)}")
-        return
+    # 모델 선택 탭
+    tab1, tab2 = st.tabs(["🎯 개별 모델", "🔬 전체 비교"])
+    
+    with tab1:
+        render_individual_model_section(video)
+    
+    with tab2:
+        render_comparison_section(video)
+
+def render_individual_model_section(video: Video):
+    """개별 모델 재추론 섹션"""
+    st.markdown("#### 특정 모델로 재분석")
+    
+    # 모델 선택 그리드
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Claude 버튼
+        model_info = multi_model_analyzer.get_model_info("claude-sonnet-4-20250514")
+        if st.button(
+            f"{model_info['icon']} {model_info['display_name']}\n{model_info['description']}",
+            key="reanalyze_claude",
+            help="Claude Sonnet 4로 상세한 재분석을 수행합니다",
+            use_container_width=True
+        ):
+            run_individual_analysis(video, "claude-sonnet-4-20250514")
+        
+        # GPT-4.1 Nano 버튼
+        model_info = multi_model_analyzer.get_model_info("gpt-4.1-nano")
+        if st.button(
+            f"{model_info['icon']} {model_info['display_name']}\n{model_info['description']}",
+            key="reanalyze_nano",
+            help="GPT-4.1 Nano로 빠른 재분석을 수행합니다",
+            use_container_width=True
+        ):
+            run_individual_analysis(video, "gpt-4.1-nano")
+    
+    with col2:
+        # Gemini 버튼
+        model_info = multi_model_analyzer.get_model_info("gemini-2.0-flash")
+        if st.button(
+            f"{model_info['icon']} {model_info['display_name']}\n{model_info['description']}",
+            key="reanalyze_gemini",
+            help="Gemini 2.0 Flash로 창의적인 재분석을 수행합니다",
+            use_container_width=True
+        ):
+            run_individual_analysis(video, "gemini-2.0-flash")
+        
+        # GPT-4o 버튼
+        model_info = multi_model_analyzer.get_model_info("gpt-4o")
+        if st.button(
+            f"{model_info['icon']} {model_info['display_name']}\n{model_info['description']}",
+            key="reanalyze_gpt4o",
+            help="GPT-4o로 균형잡힌 재분석을 수행합니다",
+            use_container_width=True
+        ):
+            run_individual_analysis(video, "gpt-4o")
+
+def render_comparison_section(video: Video):
+    """전체 모델 비교 섹션"""
+    st.markdown("#### 모든 모델 동시 비교")
+    
+    col1, col2, col3 = st.columns([2, 1, 2])
+    
+    with col2:
+        if st.button(
+            "🚀 모든 모델로 분석",
+            key="analyze_all_models",
+            type="primary",
+            help="4개 모델로 동시에 분석하고 결과를 비교합니다 (2-3분 소요)",
+            use_container_width=True
+        ):
+            run_all_models_analysis(video)
     
     st.markdown("---")
-    st.markdown("### 🔄 재추론을 위한 이미지 선택")
-    st.info("최대 10개까지 이미지를 선택할 수 있습니다.")
     
-    # 선택된 이미지 추적
-    if 'selected_images_for_reanalysis' not in st.session_state:
-        st.session_state.selected_images_for_reanalysis = set()
-    
-    # 씬 정보 준비
-    base_url = "https://ref.greatminds.kr"
-    session_id = video.session_id
-    all_scene_numbers = get_all_scene_numbers(video)
-    
-    # 선택된 이미지 개수 표시
-    selected_count = len(st.session_state.selected_images_for_reanalysis)
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.metric("선택된 이미지", f"{selected_count} / 10")
-    with col2:
-        if st.button("❌ 선택 초기화", use_container_width=True):
-            st.session_state.selected_images_for_reanalysis.clear()
-            st.rerun()
-    
-    # 이미지 그리드 표시
-    render_selectable_image_grid(base_url, session_id, all_scene_numbers)
-    
-    # 재추론 실행 버튼
-    if selected_count > 0:
-        st.markdown("---")
-        if st.button("🚀 선택한 이미지로 재추론", type="primary", use_container_width=True):
-            execute_reanalysis(video)
-    else:
-        st.warning("이미지를 선택해주세요.")
+    # 예상 소요 시간 안내
+    st.info("""
+    📊 **전체 모델 비교 분석**
+    - 🤖 GPT-4o, 🧠 Claude Sonnet 4, ✨ Gemini 2.0 Flash, ⚡ GPT-4.1 Nano
+    - ⏱️ 예상 소요 시간: 2-3분
+    - 📋 결과를 3컬럼으로 비교하여 최적의 분석을 선택할 수 있습니다
+    """)
 
-
-def render_selectable_image_grid(base_url: str, session_id: str, scene_numbers: Set[int]):
-    """선택 가능한 이미지 그리드 렌더링 - Streamlit 네이티브 방식"""
+def run_individual_analysis(video: Video, model_name: str):
+    """개별 모델 분석 실행"""
+    model_info = multi_model_analyzer.get_model_info(model_name)
     
-    # CSS 스타일 정의
-    st.markdown("""
-    <style>
-    /* 이미지 컨테이너 기본 스타일 */
-    .image-container {
-        position: relative;
-        border: 3px solid transparent;
-        border-radius: 8px;
-        padding: 5px;
-        transition: all 0.3s ease;
-        background-color: transparent;
-    }
-    
-    /* 선택된 이미지 스타일 */
-    .image-container.selected {
-        border-color: #1976d2 !important;
-        background-color: rgba(25, 118, 210, 0.05);
-        box-shadow: 0 0 15px rgba(25, 118, 210, 0.3);
-    }
-    
-    /* 선택 표시 배지 */
-    .selection-badge {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: #1976d2;
-        color: white;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 18px;
-        z-index: 10;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    
-    /* 이미지 스타일 */
-    .image-container img {
-        width: 100%;
-        height: auto;
-        display: block;
-        border-radius: 4px;
-    }
-    
-    /* 버튼 간격 조정 */
-    .stButton > button {
-        margin-top: 5px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # 썸네일 포함한 모든 이미지 준비
-    all_images = []
-    
-    # 썸네일 추가
-    thumbnail_url = f"{base_url}/{session_id}/{session_id}_Thumbnail.jpg"
-    all_images.append({
-        'url': thumbnail_url,
-        'id': 'thumbnail',
-        'label': 'Thumbnail'
-    })
-    
-    # 씬 이미지들 추가
-    for scene_num in sorted(scene_numbers):
-        scene_url = f"{base_url}/{session_id}/scene_{scene_num:04d}.jpg"
-        all_images.append({
-            'url': scene_url,
-            'id': f'scene_{scene_num:04d}',
-            'label': f'Scene {scene_num}'
-        })
-    
-    # 5열 그리드로 이미지 표시
-    num_cols = 5
-    for i in range(0, len(all_images), num_cols):
-        cols = st.columns(num_cols)
-        
-        for j, col in enumerate(cols):
-            if i + j < len(all_images):
-                img = all_images[i + j]
+    with st.spinner(f"🤖 {model_info['display_name']} 분석 중..."):
+        try:
+            # 단일 모델 분석
+            result = multi_model_analyzer.analyze_with_single_model(video, model_name)
+            
+            if result.status == "success" and result.result:
+                # 성공 시 결과 비교 표시
+                st.success(f"✅ {model_info['display_name']} 분석 완료!")
                 
-                with col:
-                    # 선택 상태 확인
-                    is_selected = img['id'] in st.session_state.selected_images_for_reanalysis
-                    
-                    # 컨테이너에 고유 ID 부여
-                    container_id = f"img_container_{img['id']}"
-                    
-                    # HTML 컨테이너로 이미지와 선택 표시를 감싸기
-                    container_class = "image-container selected" if is_selected else "image-container"
-                    
-                    # 전체 HTML 구조를 한 번에 렌더링
-                    html_content = f"""
-                    <div id="{container_id}" class="{container_class}">
-                        <img src="{img['url']}" alt="{img['label']}">
-                        {"<div class='selection-badge'>✓</div>" if is_selected else ""}
-                    </div>
-                    """
-                    
-                    st.markdown(html_content, unsafe_allow_html=True)
-                    
-                    # 토글 버튼
-                    button_label = "✓ 선택 해제" if is_selected else "선택"
-                    button_type = "secondary" if is_selected else "primary"
-                    
-                    if st.button(
-                        button_label,
-                        key=f"toggle_img_{img['id']}",
-                        use_container_width=True,
-                        type=button_type
-                    ):
-                        toggle_image_selection(img['id'])
-                        st.rerun()
+                # 기존 결과와 비교 표시
+                display_comparison_results({
+                    "기본 분석": get_current_analysis_result(video),
+                    model_info['display_name']: result
+                }, video, allow_selection=True)
+                
+            else:
+                st.error(f"❌ {model_info['display_name']} 분석 실패: {result.error_message}")
+        
+        except Exception as e:
+            st.error(f"❌ 분석 중 오류 발생: {str(e)}")
+            logger.error(f"Individual analysis failed for {model_name}: {e}")
 
-
-def toggle_image_selection(image_id: str):
-    """이미지 선택 상태 토글"""
-    if image_id in st.session_state.selected_images_for_reanalysis:
-        st.session_state.selected_images_for_reanalysis.remove(image_id)
-    else:
-        if len(st.session_state.selected_images_for_reanalysis) < 10:
-            st.session_state.selected_images_for_reanalysis.add(image_id)
-        else:
-            st.warning("최대 10개까지만 선택할 수 있습니다.")
-
-
-def get_all_scene_numbers(video) -> Set[int]:
-    """실제 존재하는 모든 씬 번호 추출"""
-    all_nums = set()
+def run_all_models_analysis(video: Video):
+    """모든 모델 분석 실행"""
+    with st.status("🔬 모든 모델로 분석 중...", expanded=True) as status:
+        try:
+            # 진행률 표시
+            progress_placeholder = st.empty()
+            models = list(multi_model_analyzer.SUPPORTED_MODELS.keys())
+            
+            results = {}
+            
+            for i, model_name in enumerate(models):
+                model_info = multi_model_analyzer.get_model_info(model_name)
+                
+                # 진행 상황 업데이트
+                progress = (i + 1) / len(models)
+                progress_placeholder.progress(progress, f"🤖 {model_info['display_name']} 분석 중... ({i+1}/{len(models)})")
+                
+                # 분석 실행
+                result = multi_model_analyzer.analyze_with_single_model(video, model_name)
+                results[model_name] = result
+                
+                # 결과 로깅
+                if result.status == "success":
+                    st.write(f"✅ {model_info['display_name']} 완료")
+                else:
+                    st.write(f"❌ {model_info['display_name']} 실패: {result.error_message}")
+            
+            progress_placeholder.empty()
+            status.update(label="✅ 모든 모델 분석 완료!", state="complete")
+            
+            # 결과 저장
+            multi_model_analyzer.save_comparison_result(video, results)
+            
+        except Exception as e:
+            st.error(f"❌ 분석 중 오류 발생: {str(e)}")
+            status.update(label="❌ 분석 실패", state="error")
+            logger.error(f"All models analysis failed: {e}")
+            return
     
-    scenes_dir = os.path.join("data/temp", video.session_id, "scenes")
-    
-    if os.path.exists(scenes_dir):
-        for filename in os.listdir(scenes_dir):
-            if filename.startswith('scene_') and filename.endswith('.jpg'):
-                try:
-                    scene_num = int(filename.replace('scene_', '').replace('.jpg', ''))
-                    all_nums.add(scene_num)
-                except:
-                    continue
-    
-    return all_nums
+    # 결과 표시
+    display_all_models_comparison(results, video)
 
-
-def execute_reanalysis(video):
-    """재추론 실행"""
-    selected_images = st.session_state.selected_images_for_reanalysis
+def display_comparison_results(results: Dict[str, Any], video: Video, allow_selection: bool = False):
+    """비교 결과 표시 (2개 결과용) - 컬럼 중첩 방지"""
+    st.markdown("### 📊 분석 결과 비교")
     
-    if not selected_images:
-        st.error("선택된 이미지가 없습니다.")
+    # 각 결과를 순차적으로 표시 (컬럼 사용하지 않음)
+    for i, (name, result) in enumerate(results.items()):
+        with st.container():
+            display_single_result_card(name, result, f"compare_{i}", allow_selection, video)
+            
+            # 결과 간 구분선 (마지막 결과 제외)
+            if i < len(results) - 1:
+                st.markdown("---")
+
+def display_all_models_comparison(results: Dict[str, ModelComparisonResult], video: Video):
+    """전체 모델 비교 결과 표시 - 컬럼 중첩 문제 해결"""
+    st.markdown("### 🔬 3개 모델 분석 결과 비교")
+    st.markdown("각 모델의 독특한 관점으로 분석한 결과를 비교하고 최적의 결과를 선택하세요.")
+    
+    # 성공한 모델만 필터링
+    successful_results = {
+        name: result for name, result in results.items() 
+        if result.status == "success" and result.result
+    }
+    
+    if not successful_results:
+        st.warning("⚠️ 성공한 분석 결과가 없습니다.")
         return
     
-    # 콘솔창 표시
-    st.markdown("### 💻 재추론 진행 상황")
-    console_container = st.container()
+    # 통계 정보 (컬럼 중첩 방지)
+    display_analysis_summary(results)
     
-    with console_container:
-        console_placeholder = st.empty()
-        
-    # 콘솔 메시지 리스트
-    console_messages = []
+    st.markdown("---")
     
-    def update_console(message: str, emoji: str = "ℹ️"):
-        """콘솔 업데이트 함수"""
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        console_messages.append(f"[{timestamp}] {emoji} {message}")
+    # 각 모델 결과를 순차적으로 표시 (컬럼 사용하지 않음)
+    for i, (model_name, result) in enumerate(successful_results.items()):
+        model_info = multi_model_analyzer.get_model_info(model_name)
         
-        # 최근 10개 메시지만 표시
-        display_messages = console_messages[-10:]
-        console_text = "\n".join(display_messages)
-        
-        console_placeholder.markdown(
-            f"""
-            <div style="
-                background-color: #1e1e1e;
-                color: #00ff00;
-                padding: 15px;
-                border-radius: 5px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 14px;
-                height: 200px;
-                overflow-y: auto;
-                white-space: pre-wrap;
-            ">
-{console_text}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    try:
-        update_console(f"재추론 시작 - {len(selected_images)}개 이미지 선택됨", "🚀")
-        
-        # 선택된 이미지 목록 표시
-        for img_id in selected_images:
-            update_console(f"선택된 이미지: {img_id}", "📸")
-        
-        # 선택된 이미지들의 Scene 객체 생성
-        from src.models.video import Scene
-        selected_scenes = []
-        
-        update_console("이미지 파일 준비 중...", "🔍")
-        
-        for img_id in selected_images:
-            if img_id == 'thumbnail':
-                # 썸네일은 분석에서 제외 (AI 분석기에서 자동으로 처리됨)
-                update_console("썸네일은 자동으로 포함됩니다", "ℹ️")
-                continue
-                
-            if img_id.startswith('scene_'):
-                scene_path = os.path.join("data/temp", video.session_id, "scenes", f"{img_id}.jpg")
-                
-                if os.path.exists(scene_path):
-                    scene = Scene(
-                        timestamp=0.0,  # 재추론시에는 timestamp가 중요하지 않음
-                        frame_path=scene_path,
-                        scene_type='selected'
-                    )
-                    selected_scenes.append(scene)
-                    update_console(f"{img_id} 준비 완료", "✅")
-                else:
-                    logger.warning(f"Scene file not found: {scene_path}")
-                    update_console(f"{img_id} 파일을 찾을 수 없습니다", "⚠️")
-        
-        if not selected_scenes:
-            st.error("선택한 이미지 파일을 찾을 수 없습니다.")
-            return
-        
-        update_console(f"총 {len(selected_scenes)}개 씬 준비 완료", "📋")
-        
-        # AI 분석기 가져오기
-        update_console("AI 분석기 초기화 중...", "🤖")
-        
-        if hasattr(st.session_state, 'video_service') and st.session_state.video_service.ai_analyzer:
-            ai_analyzer = st.session_state.video_service.ai_analyzer
+        # 각 모델마다 컨테이너로 분리
+        with st.container():
+            display_single_result_card(
+                model_info['display_name'], 
+                result, 
+                f"select_{model_name}", 
+                True, 
+                video,
+                model_name=model_name
+            )
             
-            original_scenes = video.scenes.copy() if hasattr(video, 'scenes') else []
-            original_grouped_scenes = video.grouped_scenes.copy() if hasattr(video, 'grouped_scenes') else []
+            # 모델 간 구분선 (마지막 모델 제외)
+            if i < len(successful_results) - 1:
+                st.markdown("---")
 
-            # 재추론을 위해 선택된 씬들로 교체
-            video.scenes = selected_scenes  # 이 부분 추가!
-            video.grouped_scenes = selected_scenes
+def display_single_result_card(name: str, result: Any, key_prefix: str, allow_selection: bool, video: Video, model_name: Optional[str] = None):
+    """단일 결과 카드 표시 - 컬럼 중첩 제거"""
+    
+    # 모델 정보 가져오기
+    if model_name:
+        model_info = multi_model_analyzer.get_model_info(model_name)
+        color = model_info.get('color', '#6B7280')
+        icon = model_info.get('icon', '🤖')
+    else:
+        color = '#6B7280'
+        icon = '📊'
+    
+    # 카드 헤더
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, {color}20, {color}10);
+        border: 1px solid {color}40;
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 16px;
+        text-align: center;
+    ">
+        <div style="font-size: 24px; margin-bottom: 8px;">{icon}</div>
+        <div style="font-weight: bold; color: {color}; font-size: 16px;">{name}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 결과 내용
+    if hasattr(result, 'result') and result.result:
+        # ModelComparisonResult 객체
+        analysis_result = result.result
+        
+        # 주요 정보 - 컬럼 대신 단순 표시
+        st.markdown("**🎬 장르**")
+        st.info(analysis_result.genre)
+        
+        st.markdown("**🎨 표현형식**") 
+        st.info(analysis_result.format_type)
+        
+        # 특징 미리보기
+        st.markdown("**✨ 주요 특징**")
+        features_preview = analysis_result.features[:120] + "..." if len(analysis_result.features) > 120 else analysis_result.features
+        st.write(features_preview)
+        
+        # 상위 태그
+        if analysis_result.tags:
+            st.markdown("**🏷️ 주요 태그**")
+            tags_display = " • ".join(analysis_result.tags[:6])
+            st.caption(tags_display)
+        
+        # 분석 시간 표시
+        if hasattr(result, 'analysis_time') and result.analysis_time:
+            st.caption(f"⏱️ 분석 시간: {result.analysis_time:.1f}초")
+        
+        # 전체 결과 보기
+        with st.expander("📄 상세 결과"):
+            st.markdown(f"**판단 이유:**\n{analysis_result.reason}")
+            st.markdown(f"**전체 특징:**\n{analysis_result.features}")
+            if analysis_result.mood:
+                st.markdown(f"**분위기:** {analysis_result.mood}")
+            if analysis_result.target_audience:
+                st.markdown(f"**타겟:** {analysis_result.target_audience}")
+            if len(analysis_result.tags) > 6:
+                remaining_tags = analysis_result.tags[6:]
+                st.markdown(f"**추가 태그:** {', '.join(remaining_tags)}")
+        
+        # 선택 버튼
+        if allow_selection and model_name:
+            if st.button(
+                f"✅ 이 결과 선택",
+                key=f"{key_prefix}_select",
+                help=f"{name}의 분석 결과를 최종 결과로 선택합니다",
+                use_container_width=True
+            ):
+                handle_result_selection(video, result, model_name, name)
+    
+    else:
+        # 기본 분석 결과 (현재 결과)
+        if hasattr(video, 'analysis_result') and video.analysis_result:
+            ar = video.analysis_result
             
-            update_console("AI 분석 시작...", "🧠")
-            update_console("이미지 특징 추출 중...", "🔬")
+            # 장르와 형식 - 컬럼 대신 단순 표시
+            st.markdown("**🎬 장르**")
+            st.info(ar.get('genre', 'Unknown'))
             
-            # 재분석 실행
-            new_result = ai_analyzer.analyze_video(video)
+            st.markdown("**🎨 표현형식**")
+            st.info(ar.get('expression_style', 'Unknown'))
             
-            # 원본 씬 정보는 별도 속성에 보관
-            video.original_scenes = original_scenes
+            features = ar.get('features', '')
+            features_preview = features[:120] + "..." if len(features) > 120 else features
+            st.markdown("**✨ 주요 특징**")
+            st.write(features_preview)
             
-            if new_result:
-                update_console("AI 분석 완료!", "✅")
-                update_console(f"장르: {new_result.genre}", "🎭")
-                
-                # 이전 결과 백업 (디버깅용)
-                old_genre = video.analysis_result.get('genre') if video.analysis_result else 'None'
-                old_reasoning = video.analysis_result.get('reasoning')[:50] if video.analysis_result else 'None'
-                
-                logger.info(f"Before update - Genre: {old_genre}, Reasoning: {old_reasoning}...")
-                
-                # DB 업데이트
-                update_console("데이터베이스 업데이트 중...", "💾")
-                db = VideoAnalysisDB()
-                
-                # 기존 분석 결과 삭제하지 않고 새로운 버전으로 저장
-                # (TinyDB는 버전 관리를 지원하므로 기존 결과도 보존됨)
-                
-                # 새로운 분석 결과 저장
-                analysis_data = {
-                    'genre': getattr(new_result, 'genre', ''),
-                    'reasoning': getattr(new_result, 'reason', ''),
-                    'features': getattr(new_result, 'features', ''),
-                    'tags': getattr(new_result, 'tags', []),
-                    'expression_style': getattr(new_result, 'format_type', ''),
-                    'mood_tone': getattr(new_result, 'mood', ''),
-                    'target_audience': getattr(new_result, 'target_audience', ''),
-                    'analyzed_scenes': [os.path.basename(s.frame_path) for s in selected_scenes],
-                    'model_used': os.getenv('OPENAI_MODEL', 'gpt-4o'),
-                    'reanalysis': True,  # 재분석 플래그
-                    'selected_images': list(selected_images)  # 선택된 이미지 ID 저장
-                }
-                
-                db.save_analysis_result(video.session_id, analysis_data)
-                
-                # 영상 정보도 함께 가져오기 (Notion 업데이트용)
-                video_info = db.get_video_info(video.session_id)
-                
-                db.close()
-                
-                update_console("데이터베이스 업데이트 완료", "✅")
-                
-                # Video 객체의 analysis_result 업데이트
-                video.analysis_result = {
-                    'genre': getattr(new_result, 'genre', ''),
-                    'reasoning': getattr(new_result, 'reason', ''),
-                    'features': getattr(new_result, 'features', ''),
-                    'tags': getattr(new_result, 'tags', []),
-                    'expression_style': getattr(new_result, 'format_type', ''),
-                    'mood_tone': getattr(new_result, 'mood', ''),
-                    'target_audience': getattr(new_result, 'target_audience', ''),
-                }
-                
-                # 필름스트립을 위해 선택된 씬들로 video.scenes 업데이트
-                video.scenes = selected_scenes  # 재추론에 사용된 씬들로 교체
-                
-                # 재추론 플래그 설정
-                video.is_reanalyzed = True
-                video.reanalyzed_images = list(selected_images)
-                
-                # 디버깅: 업데이트 확인
-                logger.info(f"Updated analysis_result: {video.analysis_result['genre']}")
-                logger.info(f"Updated scenes count: {len(video.scenes)}")
-                
-                # Notion 업데이트
-                update_console("Notion 업데이트 시작...", "📝")
-                try:
-                    from services.notion_service import NotionService
-                    
-                    # Notion 서비스 초기화
-                    notion = NotionService()
-                    
-                    # 연결 테스트
-                    if not notion.test_connection():
-                        update_console("Notion 연결 실패", "❌")
-                        logger.error("Notion connection failed")
-                        return
-                    
-                    update_console("Notion 연결 확인됨", "✅")
-                    
-                    # 영상 정보와 분석 결과를 함께 전달
-                    if video_info:
-                        # video_info에 필요한 필드가 없으면 추가
-                        if 'uploader' not in video_info and hasattr(video.metadata, 'uploader'):
-                            video_info['uploader'] = video.metadata.uploader
-                        if 'channel' not in video_info and hasattr(video.metadata, 'uploader'):
-                            video_info['channel'] = video.metadata.uploader
-                        if 'view_count' not in video_info and hasattr(video.metadata, 'view_count'):
-                            video_info['view_count'] = video.metadata.view_count
-                        if 'tags' not in video_info and hasattr(video.metadata, 'tags'):
-                            video_info['tags'] = video.metadata.tags
-                        if 'description' not in video_info and hasattr(video.metadata, 'description'):
-                            video_info['description'] = video.metadata.description
-                        if 'upload_date' not in video_info and hasattr(video.metadata, 'upload_date'):
-                            video_info['upload_date'] = video.metadata.upload_date
-                        if 'like_count' not in video_info and hasattr(video.metadata, 'like_count'):
-                            video_info['like_count'] = video.metadata.like_count
-                        if 'comment_count' not in video_info and hasattr(video.metadata, 'comment_count'):
-                            video_info['comment_count'] = video.metadata.comment_count
-                        if 'language' not in video_info and hasattr(video.metadata, 'language'):
-                            video_info['language'] = video.metadata.language
-                        if 'categories' not in video_info and hasattr(video.metadata, 'categories'):
-                            video_info['categories'] = video.metadata.categories
-                        
-                        # webpage_url 추가 (Vimeo 지원)
-                        if 'webpage_url' not in video_info and hasattr(video.metadata, 'webpage_url'):
-                            video_info['webpage_url'] = video.metadata.webpage_url
-                        
-                        # thumbnail 추가
-                        if 'thumbnail' not in video_info and hasattr(video.metadata, 'thumbnail'):
-                            video_info['thumbnail'] = video.metadata.thumbnail
-                        
-                        update_console(f"Video ID: {video.session_id} 데이터베이스에 추가 중...", "📄")
-                        
-                        # Notion 데이터베이스에 추가 (새로운 메서드 사용)
-                        success, message = notion.add_video_to_database(
-                            video_info,
-                            analysis_data
-                        )
-                        
-                        if success:
-                            update_console("Notion 데이터베이스 업데이트 성공!", "✅")
-                            update_console(f"페이지 ID: {message}", "📋")
-                            logger.info(f"Notion updated successfully for video: {video.session_id}")
-                            
-                            # 데이터베이스 URL 표시
-                            db_url = notion.get_database_url()
-                            update_console(f"데이터베이스 보기: {db_url}", "🔗")
-                        else:
-                            update_console(f"Notion 업데이트 실패: {message}", "❌")
-                            logger.error(f"Notion update failed: {message}")
-                    else:
-                        update_console("영상 정보를 찾을 수 없습니다", "❌")
-                        logger.error(f"Video info not found for: {video.session_id}")
-                        
-                except ImportError as e:
-                    update_console("Notion 서비스를 찾을 수 없습니다", "⚠️")
-                    logger.error(f"Notion service import error: {str(e)}")
-                except ValueError as e:
-                    update_console(f"Notion 설정 오류: {str(e)}", "❌")
-                    logger.error(f"Notion configuration error: {str(e)}")
-                    update_console("환경변수를 확인하세요: NOTION_API_KEY, NOTION_DATABASE_ID", "⚠️")
-                except Exception as e:
-                    update_console(f"Notion 업데이트 오류: {str(e)}", "❌")
-                    logger.error(f"Notion update error: {str(e)}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                
-                # 중요: Video 객체 전체를 세션 상태에 저장
-                st.session_state.analysis_result = video  # Video 객체를 저장!
-                
-                # 업데이트 시간 기록
-                from datetime import datetime
-                st.session_state.last_analysis_time = datetime.now().strftime("%H:%M:%S")
-                
-                # 디버깅: 저장 후 확인
-                logger.info(f"After saving - session analysis_result type: {type(st.session_state.analysis_result)}")
-                logger.info(f"New genre in session: {st.session_state.analysis_result.analysis_result.get('genre')}")
-                
-                st.session_state.selected_images_for_reanalysis.clear()
-                st.session_state.show_reanalysis = False
-                
-                # 분석 상태를 completed로 설정
-                from utils.session_state import set_analysis_state
-                set_analysis_state('completed')
-                
-                update_console("모든 처리가 완료되었습니다!", "🎉")
-                st.success("✅ 재추론이 완료되었습니다!")
-                st.balloons()
-                
-                # 캐시 클리어 (중요!)
-                st.cache_data.clear()
-                
-                # 페이지 새로고침
-                st.rerun()
-            else:
-                update_console("재추론에 실패했습니다", "❌")
-                st.error("재추론에 실패했습니다.")
+            tags = ar.get('tags', [])
+            if tags:
+                st.markdown("**🏷️ 주요 태그**")
+                tags_display = " • ".join(tags[:6])
+                st.caption(tags_display)
         else:
-            update_console("AI 분석기를 사용할 수 없습니다", "❌")
-            st.error("AI 분석기를 사용할 수 없습니다.")
-            
+            st.warning("분석 결과가 없습니다.")
+
+def display_analysis_summary(results: Dict[str, ModelComparisonResult]):
+    """분석 요약 정보 표시 - 컬럼 중첩 방지"""
+    st.markdown("#### 📊 분석 요약")
+    
+    # 성공/실패 통계
+    successful = len([r for r in results.values() if r.status == "success"])
+    failed = len([r for r in results.values() if r.status == "failed"])
+    
+    # 평균 분석 시간
+    times = [r.analysis_time for r in results.values() if r.analysis_time]
+    avg_time = sum(times) / len(times) if times else 0
+    
+    # 고유 장르 수
+    genres = set()
+    for result in results.values():
+        if result.status == "success" and result.result:
+            genres.add(result.result.genre)
+    
+    # 단순한 메트릭 표시 (컬럼 사용하지 않음)
+    st.markdown(f"""
+    📈 **분석 통계**
+    - ✅ 성공: {successful}개
+    - ❌ 실패: {failed}개  
+    - ⏱️ 평균 시간: {avg_time:.1f}초
+    - 🎬 장르 다양성: {len(genres)}개
+    """)
+
+def handle_result_selection(video: Video, result: ModelComparisonResult, model_name: str, display_name: str):
+    """결과 선택 처리"""
+    try:
+        st.balloons()
+        st.success(f"🎯 **{display_name}** 분석 결과가 선택되었습니다!")
+        
+        # 메인 분석 결과 업데이트
+        multi_model_analyzer._update_main_analysis_result(video, result.result, model_name)
+        
+        # 데이터베이스 저장
+        save_to_database(video, result.result, model_name)
+        
+        # 세션 상태 업데이트
+        st.session_state.analysis_result = result.result
+        st.session_state.selected_model = model_name
+        
+        st.info("💾 결과가 저장되었습니다. Notion에도 저장하시겠습니까?")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("📝 Notion에 저장", key="save_to_notion", use_container_width=True):
+                save_to_notion(video)
+        
     except Exception as e:
-        update_console(f"오류 발생: {str(e)}", "❌")
-        st.error(f"재추론 중 오류 발생: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        st.error(f"결과 선택 중 오류 발생: {str(e)}")
+        logger.error(f"Result selection failed: {e}")
+
+def save_to_database(video: Video, result, model_name: str):
+    """데이터베이스에 저장"""
+    try:
+        from src.database.video_db import VideoDatabase
+        
+        db = VideoDatabase()
+        
+        if db.video_exists(video.video_id):
+            db.update_analysis_result(video.video_id, video.analysis_result)
+        else:
+            db.save_video_with_analysis(video)
+        
+        logger.info(f"✅ 데이터베이스 저장 완료: {model_name}")
+        
+    except Exception as e:
+        st.warning(f"데이터베이스 저장 실패: {str(e)}")
+        logger.error(f"Database save failed: {e}")
+
+def save_to_notion(video: Video):
+    """Notion에 저장"""
+    try:
+        from src.services.notion_service import NotionService
+        
+        notion = NotionService()
+        
+        with st.spinner("Notion에 저장 중..."):
+            if notion.test_connection():
+                success = notion.upload_video_analysis(video)
+                if success:
+                    st.success("✅ Notion에 저장되었습니다!")
+                else:
+                    st.error("❌ Notion 저장에 실패했습니다.")
+            else:
+                st.error("❌ Notion 연결에 실패했습니다.")
+        
+    except Exception as e:
+        st.error(f"Notion 저장 실패: {str(e)}")
+        logger.error(f"Notion save failed: {e}")
+
+def get_current_analysis_result(video: Video):
+    """현재 분석 결과를 ModelComparisonResult 형태로 반환"""
+    from src.analyzer.ai_analyzer import AnalysisResult
+    
+    if hasattr(video, 'analysis_result') and video.analysis_result:
+        ar = video.analysis_result
+        
+        # AnalysisResult 객체 생성
+        current_result = AnalysisResult(
+            genre=ar.get('genre', 'Unknown'),
+            reason=ar.get('reasoning', ''),
+            features=ar.get('features', ''),
+            tags=ar.get('tags', []),
+            format_type=ar.get('expression_style', 'Unknown'),
+            mood=ar.get('mood_tone', ''),
+            target_audience=ar.get('target_audience', '')
+        )
+        
+        # ModelComparisonResult로 래핑
+        return type('MockResult', (), {
+            'result': current_result,
+            'status': 'success'
+        })()
+    
+    return None

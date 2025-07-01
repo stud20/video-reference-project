@@ -8,6 +8,7 @@ import time
 from typing import Optional, Callable
 from utils.logger import get_logger
 
+
 logger = get_logger(__name__)
 
 
@@ -21,25 +22,6 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
         # 정밀도 레벨 환경변수 설정
         import os
         os.environ["SCENE_PRECISION_LEVEL"] = str(precision_level)
-        
-        # ===== PROMPT DEBUG START - 삭제 예정 =====
-        # AI Analyzer에서 프롬프트 가로채기를 위한 임시 변수 설정
-        if hasattr(video_service, 'ai_analyzer') and video_service.ai_analyzer:
-            original_call_gpt4 = video_service.ai_analyzer._call_gpt4_vision
-            captured_prompt = None
-            captured_system_prompt = None
-            
-            def debug_call_gpt4_vision(image_payloads, prompt):
-                nonlocal captured_prompt, captured_system_prompt
-                captured_prompt = prompt
-                captured_system_prompt = video_service.ai_analyzer.system_prompt
-                # 원래 함수 호출
-                return original_call_gpt4(image_payloads, prompt)
-            
-            # 임시로 함수 교체
-            video_service.ai_analyzer._call_gpt4_vision = debug_call_gpt4_vision
-        # ===== PROMPT DEBUG END - 삭제 예정 =====
-        
         # 진행 상황 메시지 매핑
         step_messages = {
             'parsing': {
@@ -173,7 +155,7 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             console_callback("="*60 + "\n")
             
             # 원래 함수로 복원
-            video_service.ai_analyzer._call_gpt4_vision = original_call_gpt4
+            video_service.ai_analyzer._call_ai_vision = original_call_ai
         # ===== PROMPT DEBUG END - 삭제 예정 =====
         
         # 분석 완료 후 추가 정보 출력

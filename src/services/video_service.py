@@ -54,22 +54,19 @@ class VideoService:
         
         # AI 분석기 안전한 초기화
         self.ai_analyzer = None
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        
-        if openai_api_key and openai_api_key.strip():
-            try:
-                from src.analyzer.ai_analyzer import AIAnalyzer
-                self.ai_analyzer = AIAnalyzer(api_key=openai_api_key)
-                self.logger.info("✅ AI 분석기 초기화 성공")
-            except Exception as e:
-                self.logger.error(f"❌ AI 분석기 초기화 실패: {str(e)}")
-                self.logger.error(f"❌ 오류 타입: {type(e).__name__}")
-                import traceback
-                self.logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
-                self.ai_analyzer = None
-        else:
-            self.logger.warning("⚠️ OpenAI API 키가 설정되지 않음")
-        
+
+        # FactChat 전용으로 변경
+        try:
+            from src.analyzer.ai_analyzer import AIAnalyzer
+            self.ai_analyzer = AIAnalyzer()  # API 키는 AIAnalyzer 내부에서 하드코딩됨
+            self.logger.info("✅ FactChat AI 분석기 초기화 성공")
+        except Exception as e:
+            self.logger.error(f"❌ FactChat AI 분석기 초기화 실패: {str(e)}")
+            self.logger.error(f"❌ 오류 타입: {type(e).__name__}")
+            import traceback
+            self.logger.error(f"❌ 스택 트레이스:\n{traceback.format_exc()}")
+            self.ai_analyzer = None
+            
         # 스토리지 매니저 초기화
         self.logger.info(f"🗄️ StorageManager 초기화 시작 - 타입: {storage_type.value}")
         self.storage_manager = StorageManager(storage_type)
@@ -366,7 +363,7 @@ class VideoService:
                             'expression_style': getattr(analysis_result, 'format_type', ''),
                             'mood_tone': getattr(analysis_result, 'mood', ''),
                             'target_audience': getattr(analysis_result, 'target_audience', ''),
-                            'model_used': os.getenv('OPENAI_MODEL', 'gpt-4o')
+                            'model_used': 'factchat:gpt-4o'
                         }
                         
                         # DB에 저장
@@ -381,7 +378,7 @@ class VideoService:
                             'target_audience': getattr(analysis_result, 'target_audience', ''),
                             'analyzed_scenes': [os.path.basename(scene.frame_path) for scene in video.scenes[:getattr(self.ai_analyzer, 'max_images', 10)]],
                             'token_usage': {},
-                            'model_used': os.getenv('OPENAI_MODEL', 'gpt-4o')
+                            'model_used': 'factchat:gpt-4o'
                         }
                         self.db.save_analysis_result(video_id, analysis_data)
                         update_progress("analyze", 80, "✅ AI 분석 완료")

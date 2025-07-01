@@ -694,5 +694,126 @@ def get_enhanced_styles() -> str:
         border-color: #c0c0c0 !important;
     }
 
+
+
+
+
+
+    /* ===================
+       재추론 및 모델 비교 버튼 스타일
+       =================== */
+    
+    /* 개별 모델 재추론 버튼 */
+    .stButton > button[key^="reanalyze_"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border-radius: 12px !important;
+        border: none !important;
+        padding: 1rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        min-height: 80px !important;
+        font-size: 14px !important;
+        line-height: 1.3 !important;
+        white-space: pre-line !important;
+    }
+    
+    .stButton > button[key^="reanalyze_"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+    }
+    
+    /* 전체 모델 분석 버튼 */
+    .stButton > button[key="analyze_all_models"] {
+        background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%) !important;
+        color: white !important;
+        border-radius: 16px !important;
+        border: none !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        padding: 1.2rem !important;
+        transition: all 0.3s ease !important;
+        min-height: 60px !important;
+    }
+    
+    .stButton > button[key="analyze_all_models"]:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 12px 35px rgba(255, 107, 107, 0.5) !important;
+        background: linear-gradient(135deg, #4ECDC4 0%, #FF6B6B 100%) !important;
+    }
+    
+    /* 결과 선택 버튼 */
+    .stButton > button[key$="_select"] {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
+        color: white !important;
+        border-radius: 20px !important;
+        border: none !important;
+        font-weight: bold !important;
+        width: 100% !important;
+        padding: 0.8rem !important;
+        font-size: 16px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .stButton > button[key$="_select"]:hover {
+        background: linear-gradient(135deg, #45a049 0%, #4CAF50 100%) !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4) !important;
+    }
+    
+    /* Notion 저장 버튼 */
+    .stButton > button[key="save_to_notion"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border-radius: 15px !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.8rem !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button[key="save_to_notion"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+    }
+    
+    /* 모델 비교 카드 스타일링 */
+    .model-comparison-card {
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+        margin-bottom: 1rem !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        backdrop-filter: blur(10px) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .model-comparison-card:hover {
+        border-color: rgba(255, 255, 255, 0.2) !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    /* 진행률 바 스타일 개선 */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #667eea, #764ba2) !important;
+        border-radius: 10px !important;
+    }
+    
+    /* 메트릭 카드 스타일 */
+    [data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    [data-testid="metric-container"]:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
     </style>
     """
