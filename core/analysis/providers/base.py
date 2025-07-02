@@ -39,6 +39,9 @@ class AIProvider(ABC):
     def __init__(self, config: ProviderConfig):
         self.config = config
         self.logger = None  # 각 구현체에서 설정
+        
+        # 커스텀 프롬프트 설정 적용
+        self._apply_custom_settings()
     
     @abstractmethod
     def get_name(self) -> str:
@@ -79,6 +82,17 @@ class AIProvider(ABC):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": content}
         ]
+    
+    def _apply_custom_settings(self):
+        """커스텀 프롬프트 설정 적용"""
+        try:
+            from web.components.settings.prompt import get_model_parameters
+            params = get_model_parameters()
+            self.config.temperature = params.get('temperature', self.config.temperature)
+            self.config.max_tokens = params.get('max_tokens', self.config.max_tokens)
+        except ImportError:
+            # prompt 모듈이 없으면 기본값 사용
+            pass
     
     def get_token_usage(self, response: Any) -> Optional[Dict[str, int]]:
         """응답에서 토큰 사용량 추출"""

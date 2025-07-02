@@ -81,6 +81,29 @@ def render_input_section():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
+
+        # 중앙 정렬을 위해 radio를 감싸는 div 추가
+        st.markdown(
+            """
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
+            """,
+            unsafe_allow_html=True
+        )
+        model_selection = st.radio(
+            "AI 모델",
+            options=[
+            ("gemini-2.0-flash", "⚡ 빠른 분석 (Google Gemini)"),
+            ("gpt-4o", "🤖 균형 분석 (GPT-4o)"),
+            ("claude-sonnet-4-20250514", "🧠 상세 분석 (Claude Sonnet 4)")
+            ],
+            format_func=lambda x: x[1],
+            index=1,  # 기본값: GPT-4o
+            key="model_selection",
+            label_visibility="collapsed",
+            horizontal=True
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
         # 입력창과 버튼을 같은 줄에 배치
         input_col, btn_col = st.columns([3, 1])
         
@@ -99,24 +122,7 @@ def render_input_section():
                 key="analyze_start_button",
                 use_container_width=True
             )
-        
-        # 모델 선택 섹션
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 🤖 추론 모델 선택")
-        
-        model_selection = st.radio(
-            "AI 모델",
-            options=[
-                ("gemini-2.0-flash", "⚡ 빠른 분석 (Google Gemini)"),
-                ("gpt-4o", "🤖 균형 분석 (GPT-4o)"),
-                ("claude-sonnet-4-20250514", "🧠 상세 분석 (Claude Sonnet 4)")
-            ],
-            format_func=lambda x: x[1],
-            index=1,  # 기본값: GPT-4o
-            key="model_selection",
-            label_visibility="collapsed",
-            horizontal=True
-        )
+
     
     st.markdown('</div>', unsafe_allow_html=True)
     

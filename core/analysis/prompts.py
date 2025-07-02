@@ -31,7 +31,7 @@ class PromptBuilder:
     
     def __init__(self, config_path: Optional[str] = None):
         self.logger = get_logger(__name__)
-        self.config_path = config_path or "config/prompt_settings.json"
+        self.config_path = config_path or "config/prompts/prompt_settings.json"  # 경로 수정
         
         # 설정 로드
         self._load_config()

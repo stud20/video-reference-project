@@ -1,7 +1,9 @@
-# src/analyzer/parsers/response_parser.py
+# core/analysis/parser.py
 """AI 응답 파싱 모듈"""
 
 import re
+import json
+import os
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from utils.logger import get_logger
@@ -42,19 +44,83 @@ class ResponseParser:
     def __init__(self):
         self.logger = get_logger(__name__)
         
+        # 커스텀 프롬프트 설정 로드
+        self._load_custom_settings()
+        
         # 파싱 패턴들
-        self.patterns = {
-            'labeled': {
-                'genre': r'A1[.\s]*[:：]?\s*(.+?)(?:\n|$)',
-                'reason': r'A2[.\s]*[:：]?\s*(.+?)(?=A3|$)',
-                'features': r'A3[.\s]*[:：]?\s*(.+?)(?=A4|$)',
-                'tags': r'A4[.\s]*[:：]?\s*(.+?)(?=A5|$)',
-                'format_type': r'A5[.\s]*[:：]?\s*(.+?)(?=A6|$)',
-                'mood': r'A6[.\s]*[:：]?\s*(.+?)(?=A7|$)',
-                'target_audience': r'A7[.\s]*[:：]?\s*(.+?)(?=$)'
-            },
+        self.patterns = self._build_patterns()
+    
+    def _load_custom_settings(self):
+        """커스텀 프롬프트 설정 로드"""
+        settings_file = "config/prompts/prompt_settings.json"
+        
+        # 기본 분석 항목
+        self.analysis_items = [
+            {"label": "A1", "field": "genre"},
+            {"label": "A2", "field": "reason"},
+            {"label": "A3", "field": "features"},
+            {"label": "A4", "field": "tags"},
+            {"label": "A5", "field": "format_type"},
+            {"label": "A6", "field": "mood"},
+            {"label": "A7", "field": "target_audience"}
+        ]
+        
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                
+                # 분석 항목이 있으면 매핑 업데이트
+                if 'analysis_items' in settings:
+                    custom_items = settings['analysis_items']
+                    
+                    # 레이블과 필드 매핑 업데이트
+                    for i, item in enumerate(custom_items[:7]):  # 최대 7개 항목
+                        if i < len(self.analysis_items):
+                            self.analysis_items[i]["label"] = item.get("label", f"A{i+1}")
+                            # 제목에서 필드 타입 추정 (선택사항)
+                            title = item.get("title", "").lower()
+                            if "장르" in title:
+                                self.analysis_items[i]["field"] = "genre"
+                            elif "이유" in title or "판단" in title:
+                                self.analysis_items[i]["field"] = "reason"
+                            elif "특징" in title or "특이" in title:
+                                self.analysis_items[i]["field"] = "features"
+                            elif "태그" in title or "키워드" in title:
+                                self.analysis_items[i]["field"] = "tags"
+                            elif "표현" in title or "형식" in title:
+                                self.analysis_items[i]["field"] = "format_type"
+                            elif "분위기" in title or "톤" in title:
+                                self.analysis_items[i]["field"] = "mood"
+                            elif "타겟" in title or "고객" in title:
+                                self.analysis_items[i]["field"] = "target_audience"
+                
+                self.logger.info("✅ 커스텀 파싱 설정 로드 완료")
+                
+            except Exception as e:
+                self.logger.error(f"커스텀 설정 로드 실패: {str(e)}")
+    
+    def _build_patterns(self) -> Dict[str, Dict[str, str]]:
+        """동적 파싱 패턴 생성"""
+        labeled_patterns = {}
+        
+        # 커스텀 레이블 기반 패턴 생성
+        for i, item in enumerate(self.analysis_items):
+            label = item["label"]
+            field = item["field"]
+            
+            # 다음 레이블까지 또는 끝까지 매칭
+            if i < len(self.analysis_items) - 1:
+                next_label = self.analysis_items[i + 1]["label"]
+                pattern = rf'{label}[.\s]*[:：]?\s*(.+?)(?={next_label}|$)'
+            else:
+                pattern = rf'{label}[.\s]*[:：]?\s*(.+?)(?=$)'
+            
+            labeled_patterns[field] = pattern
+        
+        return {
+            'labeled': labeled_patterns,
             'section': {
-                # 섹션 기반 파싱 (빈 줄로 구분된 경우)
                 'sections': r'(?:^|\n\n)(.+?)(?=\n\n|$)'
             }
         }
@@ -77,7 +143,7 @@ class ResponseParser:
         # 여러 파싱 전략 시도
         result = None
         
-        # 1. 레이블 기반 파싱 시도 (A1, A2, ...)
+        # 1. 레이블 기반 파싱 시도 (커스텀 레이블 사용)
         result = self._parse_labeled_format(response)
         if result and self._validate_result(result):
             self.logger.info("✅ 레이블 형식 파싱 성공")
@@ -100,7 +166,7 @@ class ResponseParser:
         return self._parse_minimal(response)
     
     def _parse_labeled_format(self, response: str) -> Optional[ParsedAnalysis]:
-        """레이블 형식 파싱 (A1, A2, ...)"""
+        """레이블 형식 파싱 (커스텀 레이블 지원)"""
         try:
             result = ParsedAnalysis(raw_response=response)
             
@@ -146,20 +212,17 @@ class ResponseParser:
             # 섹션을 순서대로 매핑
             result = ParsedAnalysis(raw_response=response)
             
-            if len(sections) >= 1:
-                result.genre = self._extract_first_line(sections[0])
-            if len(sections) >= 2:
-                result.reason = self._clean_text(sections[1])
-            if len(sections) >= 3:
-                result.features = self._clean_text(sections[2])
-            if len(sections) >= 4:
-                result.tags = self._parse_tags(sections[3])
-            if len(sections) >= 5:
-                result.format_type = self._extract_first_line(sections[4])
-            if len(sections) >= 6:
-                result.mood = self._clean_text(sections[5])
-            if len(sections) >= 7:
-                result.target_audience = self._clean_text(sections[6])
+            # 커스텀 항목 순서에 따라 매핑
+            for i, section in enumerate(sections):
+                if i < len(self.analysis_items):
+                    field = self.analysis_items[i]["field"]
+                    
+                    if field == "tags":
+                        result.tags = self._parse_tags(section)
+                    elif field in ["genre", "format_type"]:
+                        setattr(result, field, self._extract_first_line(section))
+                    else:
+                        setattr(result, field, self._clean_text(section))
             
             return result
             
@@ -271,8 +334,10 @@ class ResponseParser:
     
     def _clean_text(self, text: str) -> str:
         """텍스트 정리"""
-        # A1., A2. 등 레이블 제거
-        text = re.sub(r'^A\d+[.\s]*[:：]?\s*', '', text.strip())
+        # 커스텀 레이블 패턴 제거
+        for item in self.analysis_items:
+            label = item["label"]
+            text = re.sub(rf'^{label}[.\s]*[:：]?\s*', '', text.strip())
         
         # 앞뒤 특수문자 제거
         text = re.sub(r'^[-\*\·\s]+', '', text)
