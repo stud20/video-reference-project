@@ -58,6 +58,9 @@ def get_logger(name: str) -> logging.Logger:
     
     logger.setLevel(logging.INFO)
     
+    # 부모 로거의 핸들러 상속 방지
+    logger.propagate = False
+    
     # 로그 디렉토리 생성
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)

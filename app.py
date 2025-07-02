@@ -1,29 +1,25 @@
-# app.py
+# app_new.py
 """
-AI 기반 광고 영상 콘텐츠 추론 시스템 - 깔끔한 UI
+AI 기반 광고 영상 콘텐츠 추론 시스템 - 리팩토링된 버전
 """
 
 from dotenv import load_dotenv
-load_dotenv(override=True)  # 기존 환경변수를 덮어쓰도록 설정
+load_dotenv(override=True)
 
 import streamlit as st
 import sys
 import os
 
-# src 디렉토리를 Python 경로에 추가
+# 프로젝트 루트를 Python 경로에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, 'src')
-sys.path.insert(0, src_dir)
-
-# utils 디렉토리도 Python 경로에 추가 (프로젝트 루트의 utils)
 sys.path.insert(0, current_dir)
 
 # 컴포넌트 임포트
-from ui.styles import get_enhanced_styles
-from ui.tabs.analyze_tab import render_analyze_tab
-from ui.tabs.database_tab import render_database_tab
-from ui.tabs.settings_tab import render_settings_tab
-from utils.session_state import init_session_state
+from web.styles.theme import get_enhanced_styles
+from web.pages.analyze import render_analyze_tab
+from web.pages.database import render_database_tab
+from web.pages.settings import render_settings_tab
+from web.state import init_session_state
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
