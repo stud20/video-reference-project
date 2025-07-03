@@ -79,7 +79,7 @@ class TaskResult:
 class TaskQueue:
     """작업 큐 관리자"""
     
-    def __init__(self, max_workers: int = 3, max_queue_size: int = 50):
+    def __init__(self, max_workers: int = 8, max_queue_size: int = 100):
         self.max_workers = max_workers
         self.max_queue_size = max_queue_size
         
@@ -399,6 +399,23 @@ def submit_video_analysis_task(url: str,
     
     queue = get_task_queue()
     
+    # 완료 콜백 정의 - 세션 상태 업데이트
+    def completion_callback(task_id: str, result: Any, error: Optional[str]):
+        try:
+            from utils.session_manager import get_session_manager
+            session_manager = get_session_manager()
+            
+            if error:
+                logger.error(f"작업 실패: {task_id[:8]}... - {error}")
+                # 실패 시에도 작업 종료 처리
+                session_manager.end_task(session_id, f"video_analysis_{url}")
+            else:
+                logger.info(f"작업 성공: {task_id[:8]}...")
+                session_manager.end_task(session_id, f"video_analysis_{url}")
+                
+        except Exception as e:
+            logger.error(f"완료 콜백 오류: {e}")
+    
     return queue.submit_task(
         name=f"video_analysis_{url}",
         func=handle_video_analysis_enhanced,
@@ -410,5 +427,6 @@ def submit_video_analysis_task(url: str,
         },
         priority=TaskPriority.NORMAL,
         session_id=session_id,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
+        completion_callback=completion_callback
     )

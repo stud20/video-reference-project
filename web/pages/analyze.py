@@ -15,6 +15,42 @@ from web.utils.analysis_state import reset_analysis_state
 logger = get_logger(__name__)
 
 
+def handle_chrome_extension_integration():
+    """크롬 확장프로그램 연동 처리"""
+    # URL 파라미터에서 비디오 URL 추출
+    query_params = st.query_params
+    video_url = query_params.get('video')
+    
+    if video_url:
+        # 확장프로그램을 통한 접근임을 표시
+        st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #4CAF50, #45a049);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                text-align: center;
+                box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+                font-weight: 500;
+            ">
+                🔗 크롬 확장프로그램을 통해 연결되었습니다
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 자동으로 URL 입력 필드에 값 설정
+        st.session_state.analyze_url_input = video_url
+        
+        # 자동 분석 시작
+        if 'chrome_extension_auto_start' not in st.session_state:
+            st.session_state.chrome_extension_auto_start = True
+            # 기본 모델로 자동 분석 시작
+            st.session_state.selected_model = 'gpt-4o'
+            st.session_state.current_video_url = video_url
+            set_analysis_state('processing')
+            st.rerun()
+
+
 def render_version_history():
     """버전 히스토리 렌더링"""
     st.markdown("""
@@ -73,6 +109,9 @@ def render_analyze_tab():
 
 def render_input_section():
     """URL 입력 섹션 - Figma 디자인"""
+    
+    # 크롬 확장프로그램 연동 처리
+    handle_chrome_extension_integration()
     
     # 사용방법 안내
     st.markdown("""

@@ -96,9 +96,11 @@ def render_system_status():
         
         st.markdown(f"""
         **🔗 연결 상태**
-        - 현재 사용자: {session_stats['active_sessions']}명
+        - 전체 사용자: {session_stats['total_sessions']}명
+        - 활성 사용자: {session_stats['active_sessions']}명
         - 처리 중: {session_stats['processing_sessions']}명
         - 활성 작업: {session_stats['total_active_tasks']}개
+        - 최대 사용자: {session_stats['max_concurrent_users']}명
         """)
         
         # 작업 큐 상태
@@ -140,6 +142,12 @@ def render_system_status():
         - 적중률: {hit_rate:.1f}%
         - Redis: {'✅' if cache_stats.get('redis_available') else '❌'}
         """)
+        
+        # 세션 정리 버튼
+        if st.button("🧡 비활성 세션 정리", key="cleanup_sessions"):
+            session_manager._cleanup_inactive_sessions()
+            st.success("비활성 세션 정리 완료")
+            st.rerun()
         
         # 새로고침 버튼
         if st.button("🔄 새로고침", key="refresh_status"):
@@ -231,6 +239,9 @@ def handle_optimized_video_analysis(video_url: str, model_name: str = "gpt-4o"):
         session_manager = get_session_manager()
         current_session = get_current_session()
         session_manager.end_task(current_session.session_id, f"analysis_{video_url}")
+        
+        # 추가: 분석 완료 후 세션 상태 업데이트
+        session_manager.mark_pipeline_completed(current_session.session_id)
 
 
 def render_health_check():

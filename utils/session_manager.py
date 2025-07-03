@@ -37,7 +37,7 @@ class UserSession:
 class SessionManager:
     """사용자 세션 관리자"""
     
-    def __init__(self, max_concurrent_users: int = 5, max_concurrent_tasks: int = 3):
+    def __init__(self, max_concurrent_users: int = 15, max_concurrent_tasks: int = 8):
         self.max_concurrent_users = max_concurrent_users
         self.max_concurrent_tasks = max_concurrent_tasks
         self.sessions: Dict[str, UserSession] = {}
@@ -135,6 +135,18 @@ class SessionManager:
             session.last_active = datetime.now()
             logger.info(f"작업 완료: {task_name} (세션: {session_id[:8]}..., 남은 작업: {session.active_tasks}개)")
     
+    def mark_pipeline_completed(self, session_id: str):
+        """파이프라인 완료 시 세션 상태 업데이트 - 5분 후 정리 대상이 됨"""
+        with self.lock:
+            if session_id not in self.sessions:
+                return
+            
+            session = self.sessions[session_id]
+            session.last_active = datetime.now()
+            session.status = "completed"
+            
+            logger.info(f"파이프라인 완료: {session_id[:8]}... - 5분 후 정리 예정")
+    
     def get_workspace_path(self, session_id: str, subdirectory: str = "") -> str:
         """작업 공간 경로 반환"""
         if session_id not in self.sessions:
@@ -173,10 +185,11 @@ class SessionManager:
         expired_sessions = []
         
         for session_id, session in self.sessions.items():
-            # 30분 이상 비활성 세션 정리
-            if (now - session.last_active).total_seconds() > 1800:  # 30분
+            # 5분 이상 비활성 세션 정리
+            if (now - session.last_active).total_seconds() > 300:  # 5분
                 if session.active_tasks == 0:  # 진행 중인 작업이 없는 경우만
                     expired_sessions.append(session_id)
+                    logger.info(f"세션 만료 대상: {session_id[:8]}... (상태: {session.status}, 마지막 활동: {session.last_active.strftime('%H:%M:%S')})")
         
         for session_id in expired_sessions:
             logger.info(f"비활성 세션 정리: {session_id[:8]}...")
@@ -212,7 +225,7 @@ class SessionManager:
 class SystemResourceMonitor:
     """시스템 리소스 모니터링"""
     
-    def __init__(self, max_cpu_percent: float = 80.0, max_memory_percent: float = 85.0):
+    def __init__(self, max_cpu_percent: float = 70.0, max_memory_percent: float = 80.0):
         self.max_cpu_percent = max_cpu_percent
         self.max_memory_percent = max_memory_percent
     

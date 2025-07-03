@@ -109,6 +109,16 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
             console_callback("━" * 50)
             console_callback("🎉 모든 처리가 완료되었습니다!")
         
+        # 파이프라인 완료 후 세션 상태 업데이트
+        try:
+            from utils.session_manager import get_session_manager, get_current_session
+            session_manager = get_session_manager()
+            current_session = get_current_session()
+            session_manager.mark_pipeline_completed(current_session.session_id)
+            console_callback("💾 분석 완료 - 세션 상태 업데이트됨 (5분 후 정리 예정)")
+        except Exception as session_error:
+            logger.warning(f"세션 상태 업데이트 실패: {session_error}")
+        
         return video
         
     except Exception as e:
