@@ -56,7 +56,9 @@ def get_logger(name: str) -> logging.Logger:
     if logger.handlers:
         return logger
     
-    logger.setLevel(logging.INFO)
+    # 환경변수로 로그 레벨 설정 가능
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    logger.setLevel(getattr(logging, log_level, logging.INFO))
     
     # 부모 로거의 핸들러 상속 방지
     logger.propagate = False

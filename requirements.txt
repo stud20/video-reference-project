@@ -22,12 +22,16 @@ tinydb>=4.8.0               # 로컬 JSON 데이터베이스
 # ===== API 클라이언트 =====
 notion-client>=2.2.0        # Notion API 연동
 paramiko>=3.3.1             # SFTP 연결 (Synology NAS)
+asyncssh>=2.14.0            # 비동기 SFTP (동시 업로드)
+nest-asyncio>=1.5.8         # 이벤트 루프 충돌 해결
 requests>=2.31.0            # HTTP 요청
 urllib3>=2.0.0              # requests 의존성
 
 # ===== 유틸리티 =====
 python-dotenv>=1.0.0        # 환경변수 관리 (.env 파일)
 python-dateutil>=2.8.2      # 날짜/시간 처리
+psutil>=5.9.0               # 시스템 리소스 모니터링
+redis>=5.0.0                # Redis 캐시 (선택사항)
 
 # ===== 시스템 요구사항 =====
 # FFmpeg (별도 설치 필요)

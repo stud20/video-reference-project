@@ -2,7 +2,7 @@
 """스토리지 매니저 - 다양한 스토리지 백엔드 지원"""
 import os
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from utils.logger import get_logger
 
 
@@ -238,3 +238,66 @@ class StorageManager:
         elif self.storage_type == StorageType.LOCAL and self.local_storage:
             return getattr(self.local_storage, 'base_path', 'results/videos')
         return 'N/A'
+    
+    def upload_files_batch(self, file_pairs: List[Tuple[str, str]], 
+                          progress_callback=None) -> List[Dict[str, Any]]:
+        """
+        여러 파일을 배치로 업로드
+        
+        Args:
+            file_pairs: [(local_path, remote_path), ...] 형태의 리스트
+            progress_callback: 진행률 콜백 함수 (optional)
+            
+        Returns:
+            각 파일의 업로드 결과 리스트
+        """
+        try:
+            if self.storage_type == StorageType.SFTP:
+                # 비동기 SFTP 사용
+                self.logger.info(f"🚀 SFTP 배치 업로드 시작: {len(file_pairs)}개 파일")
+                from .sftp_batch_wrapper import SFTPBatchUploader
+                uploader = SFTPBatchUploader()
+                return uploader.upload_batch(file_pairs, progress_callback)
+                
+            elif self.storage_type == StorageType.WEBDAV:
+                # WebDAV는 아직 배치 미구현 - 순차 처리
+                self.logger.warning("WebDAV 배치 업로드 미구현 - 순차 처리로 대체")
+                results = []
+                for local_path, remote_path in file_pairs:
+                    success = self.upload_file(local_path, remote_path)
+                    results.append({
+                        "local_path": local_path,
+                        "remote_path": remote_path,
+                        "success": success,
+                        "error": None if success else "업로드 실패"
+                    })
+                return results
+                
+            elif self.storage_type == StorageType.LOCAL:
+                # 로컬은 순차 복사
+                results = []
+                for local_path, remote_path in file_pairs:
+                    success = self.upload_file(local_path, remote_path)
+                    results.append({
+                        "local_path": local_path,
+                        "remote_path": remote_path,
+                        "success": success,
+                        "error": None if success else "복사 실패"
+                    })
+                return results
+                
+            else:
+                self.logger.error(f"지원하지 않는 스토리지 타입: {self.storage_type}")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"배치 업로드 실패: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            # 모든 파일을 실패로 처리
+            return [{
+                "local_path": local,
+                "remote_path": remote,
+                "success": False,
+                "error": str(e)
+            } for local, remote in file_pairs]
