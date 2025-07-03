@@ -21,11 +21,10 @@ class DownloadStage(PipelineStage):
     
     def execute(self, context: PipelineContext) -> PipelineContext:
         """다운로드 실행"""
-        self.update_progress(20, "📥 영상 정보 가져오는 중...", context)
+        self.update_progress(0, "📥 영상 다운로드 시작...", context)
         
-        # 다운로드 실행
-        self.update_progress(25, "📥 영상 다운로드 시작...", context)
-        download_result = self.downloader.download_legacy(context.url)
+        # 다운로드 실행 (내부 progress callback 없이)
+        download_result = self.downloader.download_legacy(context.url, None)
         
         context.download_result = download_result
         
@@ -65,6 +64,6 @@ class DownloadStage(PipelineStage):
         
         context.video_object = video
         
-        self.update_progress(35, f"✅ 다운로드 완료: {video.metadata.title}", context)
+        self.update_progress(100, f"✅ 다운로드 완료: {video.metadata.title}", context)
         
         return context

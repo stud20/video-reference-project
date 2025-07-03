@@ -22,12 +22,11 @@ class PromptBuilder:
     # 기본 표현 형식
     DEFAULT_FORMAT_TYPES = ["2D", "3D", "실사", "혼합형", "스톱모션", "타이포그래피"]
     
-    # 기본 시스템 프롬프트
-    DEFAULT_SYSTEM_PROMPT = """당신은 광고 영상 전문 분석가입니다. 주어진 이미지들과 메타데이터를 종합적으로 분석하여 영상의 장르, 특징, 타겟 등을 상세히 분석해주세요. 메타데이터는 참고용이며, 실제 이미지 내용을 우선시하여 분석해주세요."""
+    # 기본 시스템 프롬프트 (더 중립적으로 수정)
+    DEFAULT_SYSTEM_PROMPT = """You are a professional video content analyst. Please analyze the provided images and metadata to identify the video's genre, characteristics, and target audience. Focus on visual elements, production style, and content structure. Prioritize actual image content over metadata when they differ."""
     
-    # 기본 분석 지침
-    DEFAULT_ANALYSIS_INSTRUCTION = """제공된 메타데이터(제목, 설명, 태그 등)를 참고하여 더 정확한 분석을 수행하되,
-실제 이미지 내용이 메타데이터와 다를 경우 이미지 내용을 우선시해주세요."""
+    # 기본 분석 지침 (영어로 수정)
+    DEFAULT_ANALYSIS_INSTRUCTION = """Please refer to the provided metadata (title, description, tags, etc.) for more accurate analysis, but prioritize actual image content when it differs from metadata."""
     
     def __init__(self, config_path: Optional[str] = None):
         self.logger = get_logger(__name__)

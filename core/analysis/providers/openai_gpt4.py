@@ -146,10 +146,20 @@ class OpenAIProvider(AIProvider):
             # 응답 구조 로깅
             self.logger.info(f"OpenAI 응답 키: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
             
-            # 오류 메시지가 있는지 확인
-            if isinstance(result, dict) and "error" in result:
-                self.logger.error(f"❌ API 오류 메시지: {result.get('error')}")
-                return None
+            # 오류 메시지가 있는지 확인 - Azure OpenAI 오류 포함
+            if isinstance(result, dict):
+                if "error" in result:
+                    self.logger.error(f"❌ API 오류 메시지: {result.get('error')}")
+                    return None
+                elif "detail" in result:
+                    # Azure OpenAI 오류 처리
+                    detail = result.get('detail', '')
+                    if 'ResponsibleAIPolicyViolation' in str(detail):
+                        self.logger.error("❌ Azure OpenAI 콘텐츠 필터에 의해 차단됨")
+                        self.logger.error("💡 해결 방안: Claude 또는 Gemini 모델을 사용해보세요")
+                    else:
+                        self.logger.error(f"❌ FactChat API 오류: {detail}")
+                    return None
             
             # 응답에서 content 추출 - 다양한 형식 지원
             content = None

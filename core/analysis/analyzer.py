@@ -88,6 +88,10 @@ class VideoAnalyzer:
             )
             
             if not response:
+                # Azure OpenAI 콘텐츠 필터 문제일 가능성 확인
+                if "OpenAI" in self.provider.get_name():
+                    self.logger.error("❌ Azure OpenAI 콘텐츠 필터로 인해 분석이 차단되었을 가능성이 있습니다")
+                    self.logger.error("💡 해결 방안: Claude Sonnet 4 또는 Gemini 모델을 선택해보세요")
                 self.logger.error("API 응답이 없습니다")
                 return None
             

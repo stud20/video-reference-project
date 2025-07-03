@@ -2,7 +2,7 @@ import yt_dlp
 import os
 import re
 import subprocess
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Callable
 from core.video.downloader.base import VideoFetcher
 from core.video.models import Video, VideoMetadata
 from utils.logger import get_logger
@@ -97,7 +97,7 @@ class YouTubeDownloader(VideoFetcher):
 
 
 
-    def download(self, video: Video) -> Tuple[str, VideoMetadata]:
+    def download(self, video: Video, progress_callback: Optional[Callable] = None) -> Tuple[str, VideoMetadata]:
         """
         비디오 다운로드 - 메타데이터 추출 및 macOS 호환성 보장
         
@@ -112,6 +112,7 @@ class YouTubeDownloader(VideoFetcher):
             url = self._normalize_url(video.url)
             # 1. 먼저 정보만 추출
             self.logger.info(f"📊 메타데이터 추출 중: {url}")
+            # progress_callback 제거 (너무 자주 호출됨)
             with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
                 video_id = info.get('id', '')
@@ -140,6 +141,7 @@ class YouTubeDownloader(VideoFetcher):
             
             self.logger.info(f"📥 다운로드 시작: {url} (품질: {quality_option})")
             self.logger.info(f"📁 저장 위치: {output_dir}")
+            # progress_callback 제거
             
             # 5. 다운로드 실행
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -162,6 +164,7 @@ class YouTubeDownloader(VideoFetcher):
             
             # 6. macOS 호환성 확인 및 필요시 재인코딩
             self.logger.info("🎥 macOS 호환성 확인 중...")
+            # progress_callback 제거
             processed_file = self.video_processor.process_video(downloaded_file)
             
             # 7. 파일 크기 확인
@@ -172,6 +175,7 @@ class YouTubeDownloader(VideoFetcher):
             subtitle_files = self._find_subtitle_files(output_dir)
             
             # 9. 썸네일 파일 처리
+            # progress_callback 제거
             thumbnail_file = self._download_and_save_thumbnail(info, output_dir, video_id)
             
             # 10. 메타데이터 생성
@@ -203,6 +207,7 @@ class YouTubeDownloader(VideoFetcher):
             video.metadata = metadata
             
             # 메타데이터 파일 저장
+            # progress_callback 제거
             self.save_metadata(video)
             
             self.logger.info(f"✅ 다운로드 및 처리 완료: {safe_title}")
@@ -216,18 +221,23 @@ class YouTubeDownloader(VideoFetcher):
             else:
                 self.logger.info(f"🏷 태그: 없음")
             
+            # 마지막 progress_callback만 유지
+            if progress_callback:
+                progress_callback("download", 100, f"✅ 다운로드 완료: {metadata.title}")
+            
             return processed_file, metadata
             
         except Exception as e:
             self.logger.error(f"다운로드 실패: {str(e)}")
             raise
     
-    def download_legacy(self, url: str) -> Dict[str, Any]:
+    def download_legacy(self, url: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
         레거시 다운로드 메소드 - Dict 형태로 반환
         
         Args:
             url: 다운로드할 비디오 URL
+            progress_callback: 진행률 콜백 함수
             
         Returns:
             다운로드 결과 딕셔너리
@@ -243,7 +253,7 @@ class YouTubeDownloader(VideoFetcher):
         video.session_dir = os.path.join(self.temp_dir, video_id)
         
         # 다운로드 수행
-        filepath, metadata = self.download(video)
+        filepath, metadata = self.download(video, progress_callback)
         
         # Dict 형태로 변환
         return {

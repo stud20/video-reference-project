@@ -208,7 +208,7 @@ def render_input_section():
         st.error("URL을 입력해주세요!")
 
 def render_processing_section():
-    """처리 중 섹션"""
+    """처리 중 섹션 - 향상된 콘솔 및 프로그레스 바"""
     video_url = st.session_state.get('current_video_url')
     if not video_url:
         st.error("비디오 URL이 존재하지 않습니다.")
@@ -218,47 +218,190 @@ def render_processing_section():
     from web.components.analyze.results import render_video_embed
     render_video_embed(video_url)
 
-    # 콘솔창
-    st.markdown("### 💻 처리 상황")
+    # 처리 상태 초기화
+    if 'processing_state' not in st.session_state:
+        st.session_state.processing_state = {
+            'current_stage': 'init',
+            'progress': 0,
+            'total_stages': 7,
+            'console_logs': [],
+            'stage_progress': {},
+            'start_time': time.time()
+        }
+    
+    # 전체 진행률 표시
+    st.markdown("### 🎬 영상 분석 진행 상황")
+    
+    # 메인 프로그레스 바만 표시
+    progress_col1, progress_col2 = st.columns([3, 1])
+    
+    with progress_col1:
+        main_progress = st.progress(0)
+        stage_info = st.empty()
+    
+    with progress_col2:
+        elapsed_time = st.empty()
+        estimated_time = st.empty()
+    
+    # 단계 정의 (프로그레스 바는 제거)
+    stages = [
+        ("url_parser", "🔍 URL 분석"),
+        ("download", "📥 영상 다운로드"),
+        ("scene_extraction", "🎞️ 장면 추출"),
+        ("ai_analysis", "🤖 AI 분석"),
+        ("metadata_save", "💾 메타데이터 저장"),
+        ("storage_upload", "☁️ 스토리지 업로드"),
+        ("cleanup", "🧹 정리")
+    ]
+    
+    # 실시간 콘솔 로그
+    st.markdown("#### 💻 실시간 로그")
     console_container = st.container()
     
     with console_container:
         console_placeholder = st.empty()
     
-    # 로그 라인 저장용
-    if 'console_logs' not in st.session_state:
-        st.session_state.console_logs = []
+    # 상세 로그 토글
+    show_detailed_logs = st.checkbox("상세 로그 표시", value=False)
     
-    def update_console(message: str):
-        """콘솔 업데이트"""
-        st.session_state.console_logs.append(f"> {message}")
-        if len(st.session_state.console_logs) > 3:
-            st.session_state.console_logs.pop(0)
+    if show_detailed_logs:
+        detailed_logs_container = st.empty()
+    
+    def update_progress_and_console(stage: str, progress: int, message: str, detailed_message: str = None):
+        """프로그레스 바와 콘솔 업데이트"""
+        current_time = time.time()
         
-        console_text = "\n".join(st.session_state.console_logs)
+        # 처리 상태 업데이트
+        st.session_state.processing_state['current_stage'] = stage
+        st.session_state.processing_state['stage_progress'][stage] = progress
+        
+        # 전체 진행률 계산 (단순화)
+        stage_weights = {
+            'url_parser': 5,     # URL 분석
+            'download': 30,      # 다운로드
+            'scene_extraction': 40,  # 장면 추출
+            'ai_analysis': 20,   # AI 분석
+            'metadata_save': 3,  # 메타데이터 저장
+            'storage_upload': 1, # 스토리지 업로드
+            'cleanup': 1         # 정리
+        }
+        
+        # 현재 단계의 진행률만 사용하여 전체 진행률 계산
+        total_progress = 0
+        current_stage_weight = stage_weights.get(stage, 0)
+        
+        # 이전 단계들의 가중치 합계
+        stage_order = ['url_parser', 'download', 'scene_extraction', 'ai_analysis', 'metadata_save', 'storage_upload', 'cleanup']
+        current_stage_index = stage_order.index(stage) if stage in stage_order else 0
+        
+        # 이전 단계들은 100% 완료로 처리
+        for i in range(current_stage_index):
+            total_progress += stage_weights.get(stage_order[i], 0)
+        
+        # 현재 단계의 진행률 추가
+        total_progress += (progress / 100) * current_stage_weight
+        
+        # UI 업데이트
+        main_progress.progress(total_progress / 100)
+        
+        # 현재 단계 정보
+        stage_names = dict(stages)
+        current_stage_name = stage_names.get(stage, stage)
+        stage_info.markdown(f"**{current_stage_name}** - {message}")
+        
+        # 시간 정보
+        elapsed = current_time - st.session_state.processing_state['start_time']
+        elapsed_time.markdown(f"**경과 시간**: {elapsed:.1f}초")
+        
+        if total_progress > 0:
+            estimated_total = elapsed * (100 / total_progress)
+            remaining = estimated_total - elapsed
+            estimated_time.markdown(f"**예상 완료**: {remaining:.1f}초")
+        
+        # 개별 단계 프로그레스 바 업데이트 제거
+        # (메인 프로그레스 바만 사용)
+        
+        # 콘솔 로그 업데이트 (중요한 메시지만 표시)
+        timestamp = time.strftime('%H:%M:%S')
+        formatted_message = f"[{timestamp}] {message}"
+        
+        st.session_state.processing_state['console_logs'].append(formatted_message)
+        # 로그 개수를 8개로 제한하여 깔끔하게 유지
+        if len(st.session_state.processing_state['console_logs']) > 8:
+            st.session_state.processing_state['console_logs'].pop(0)
+        
+        # 콘솔 표시
+        console_text = "\n".join(st.session_state.processing_state['console_logs'])
         console_placeholder.markdown(
             f"""
             <div style="
-                background-color: #1e1e1e;
-                color: #00ff00;
-                padding: 15px;
-                border-radius: 5px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 14px;
-                height: 150px;
+                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+                color: #00ff41;
+                padding: 20px;
+                border-radius: 10px;
+                font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+                font-size: 13px;
+                line-height: 1.6;
+                height: 200px;
                 overflow-y: auto;
                 white-space: pre-wrap;
+                border: 1px solid #333;
+                box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
             ">
 {console_text}
             </div>
             """,
             unsafe_allow_html=True
         )
+        
+        # 상세 로그 (선택적)
+        if show_detailed_logs and detailed_message:
+            if 'detailed_logs' not in st.session_state:
+                st.session_state.detailed_logs = []
+            
+            st.session_state.detailed_logs.append(f"[{timestamp}] {detailed_message}")
+            if len(st.session_state.detailed_logs) > 20:
+                st.session_state.detailed_logs.pop(0)
+            
+            detailed_text = "\n".join(st.session_state.detailed_logs)
+            detailed_logs_container.markdown(
+                f"""
+                <div style="
+                    background: #1a1a1a;
+                    color: #888;
+                    padding: 15px;
+                    border-radius: 5px;
+                    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+                    font-size: 11px;
+                    line-height: 1.4;
+                    height: 200px;
+                    overflow-y: auto;
+                    white-space: pre-wrap;
+                    border: 1px solid #333;
+                    margin-top: 10px;
+                ">
+{detailed_text}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        
+        # 화면 업데이트
+        time.sleep(0.1)
 
     try:
-        st.session_state.console_logs = []
+        # 처리 상태 초기화
+        st.session_state.processing_state = {
+            'current_stage': 'init',
+            'progress': 0,
+            'total_stages': 7,
+            'console_logs': [],
+            'stage_progress': {},
+            'start_time': time.time()
+        }
+        
         precision_level = st.session_state.get('precision_level', 5)
-        selected_model = st.session_state.get('selected_model', 'gpt-4o')  # 기본값: GPT-4o
+        selected_model = st.session_state.get('selected_model', 'gpt-4o')
         
         # 모델 이름 표시
         model_display_names = {
@@ -266,21 +409,42 @@ def render_processing_section():
             "gpt-4o": "GPT-4o",
             "claude-sonnet-4-20250514": "Claude Sonnet 4"
         }
-        update_console(f"🤖 선택된 AI 모델: {model_display_names.get(selected_model, selected_model)}")
+        
+        update_progress_and_console(
+            "init", 0, 
+            f"🤖 AI 모델 선택: {model_display_names.get(selected_model, selected_model)}",
+            f"Starting analysis with model: {selected_model}, precision: {precision_level}"
+        )
 
         video = handle_video_analysis_enhanced(
             video_url=video_url,
             precision_level=precision_level,
-            console_callback=update_console,
-            model_name=selected_model  # 선택된 모델 전달
+            console_callback=lambda msg: update_progress_and_console(
+                st.session_state.processing_state.get('current_stage', 'processing'),
+                st.session_state.processing_state.get('progress', 0),
+                msg,
+                msg
+            ),
+            model_name=selected_model,
+            progress_callback=update_progress_and_console
         )
 
         # video 객체 검증
         if video and hasattr(video, 'url') and hasattr(video, 'session_id'):
+            update_progress_and_console("completed", 100, "✅ 분석 완료!", "Analysis completed successfully")
             st.session_state.analysis_result = video
-            st.session_state.console_logs = []
+            
+            # 처리 상태 정리
+            if 'processing_state' in st.session_state:
+                del st.session_state.processing_state
+            if 'detailed_logs' in st.session_state:
+                del st.session_state.detailed_logs
+            
             set_analysis_state('completed')
             logger.info(f"Analysis completed successfully for video: {video.session_id}")
+            
+            # 완료 후 잠시 대기
+            time.sleep(2)
         else:
             raise ValueError("Invalid video object returned from analysis")
         
@@ -288,7 +452,15 @@ def render_processing_section():
 
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
+        update_progress_and_console("error", 0, f"❌ 오류 발생: {str(e)}", f"Error details: {str(e)}")
         st.error(f"분석 중 오류 발생: {str(e)}")
-        st.session_state.console_logs = []
+        
+        # 처리 상태 정리
+        if 'processing_state' in st.session_state:
+            del st.session_state.processing_state
+        if 'detailed_logs' in st.session_state:
+            del st.session_state.detailed_logs
+        
         set_analysis_state('idle')
+        time.sleep(3)
         st.rerun()

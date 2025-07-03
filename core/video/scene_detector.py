@@ -4,7 +4,7 @@
 import os
 import cv2
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Callable
 from pathlib import Path
 import subprocess
 import json
@@ -207,7 +207,7 @@ class SceneExtractor:
         self.logger.info(f"🎯 목표 씬 개수: {self.target_scene_count}개")
     
         
-    def extract_scenes(self, video_path: str, session_id: str) -> Dict[str, Any]:
+    def extract_scenes(self, video_path: str, session_id: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """비디오에서 모든 씬 추출 후 정밀도에 따라 그룹화"""
         # 시작하기 전에 최신 설정 로드
         settings_changed = self.update_settings()
@@ -236,7 +236,7 @@ class SceneExtractor:
             
             # 3. 모든 씬 중간점에서 프레임 추출
             all_scenes = self._extract_frames_at_midpoints(
-                video_path, scene_changes, output_dir, duration
+                video_path, scene_changes, output_dir, duration, progress_callback
             )
             
             self.logger.info(f"📸 총 {len(all_scenes)}개 씬 추출 완료")
@@ -245,7 +245,7 @@ class SceneExtractor:
             grouped_scenes = []
             if len(all_scenes) > 0:
                 self.logger.info(f"🔬 정밀도 레벨 {self.precision_level}로 씬 그룹화 시작...")
-                grouped_scenes = self._group_similar_scenes_precision(all_scenes.copy(), output_dir)
+                grouped_scenes = self._group_similar_scenes_precision(all_scenes.copy(), output_dir, progress_callback)
                 
                 # 그룹화된 씬들을 별도 디렉토리에 저장
                 grouped_scenes = self._save_grouped_scenes(grouped_scenes, session_id)
@@ -317,7 +317,8 @@ class SceneExtractor:
         video_path: str, 
         scene_changes: List[float], 
         output_dir: str,
-        duration: float
+        duration: float,
+        progress_callback: Optional[Callable] = None
     ) -> List[Scene]:
         """씬 중간점에서 프레임 추출"""
         scenes = []
@@ -334,6 +335,8 @@ class SceneExtractor:
             quality = '1'  # 최고 품질
         
         # 각 씬의 중간점 계산
+        total_scenes = len(scene_changes) - 1
+        
         for i in range(len(scene_changes) - 1):
             start_time = scene_changes[i]
             end_time = scene_changes[i + 1]
@@ -341,6 +344,11 @@ class SceneExtractor:
             # 너무 짧은 씬 제외
             if end_time - start_time < self.min_scene_duration:
                 continue
+            
+            # 진행률 업데이트
+            if progress_callback and total_scenes > 0:
+                progress = int(40 + (i / total_scenes) * 30)  # 40-70% 범위
+                progress_callback(progress, f"📸 프레임 추출 중... {i+1}/{total_scenes}")
             
             # 중간점 계산
             mid_time = (start_time + end_time) / 2
@@ -374,7 +382,7 @@ class SceneExtractor:
         
         return scenes
     
-    def _group_similar_scenes_precision(self, scenes: List[Scene], output_dir: str) -> List[Scene]:
+    def _group_similar_scenes_precision(self, scenes: List[Scene], output_dir: str, progress_callback: Optional[Callable] = None) -> List[Scene]:
         """정밀도 레벨 기반 씬 그룹화 알고리즘 (개선된 버전)"""
         if len(scenes) <= self.min_scenes_for_grouping:
             # 씬이 적은 경우 목표 개수에 맞춰 조정

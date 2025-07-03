@@ -20,14 +20,15 @@ class SceneExtractionStage(PipelineStage):
     
     def execute(self, context: PipelineContext) -> PipelineContext:
         """씬 추출 실행"""
-        self.update_progress(50, "🎬 주요 씬 추출 시작...", context)
+        self.update_progress(0, "🎞️ 장면 추출 시작...", context)
         
         video = context.video_object
         
-        # 씬 추출
+        # 씬 추출 (내부 progress callback 없이)
         scenes_result = self.extractor.extract_scenes(
             video.local_path,
-            video.session_id
+            video.session_id,
+            progress_callback=None
         )
         
         # Scene 객체로 변환
@@ -56,6 +57,6 @@ class SceneExtractionStage(PipelineStage):
         
         context.scenes = video.scenes
         
-        self.update_progress(60, f"✅ {len(video.scenes)}개 씬 추출 완료", context)
+        self.update_progress(100, f"✅ {len(video.scenes)}개 씬 추출 완료", context)
         
         return context

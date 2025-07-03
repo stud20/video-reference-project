@@ -74,22 +74,19 @@ class AIAnalysisStage(PipelineStage):
             "claude-sonnet-4-20250514": "Claude Sonnet 4"
         }.get(self.model_name, self.model_name)
         
-        self.update_progress(65, f"🤖 {model_display} AI 분석 시작...", context)
-        self.update_progress(70, "🤖 이미지 준비 중...", context)
+        self.update_progress(0, f"🤖 {model_display} AI 분석 시작...", context)
         
         # AI 분석 실행
         analysis_result = self.analyzer.analyze_video(video)
         
         if analysis_result:
-            self.update_progress(75, f"✅ AI 분석 성공: {analysis_result.get('genre', 'Unknown')}", context)
+            self.update_progress(70, f"✅ AI 분석 성공: {analysis_result.get('genre', 'Unknown')}", context)
             
             # Video 객체에 저장
             video.analysis_result = analysis_result
             context.analysis_result = analysis_result
             
             # DB에 저장
-            self.update_progress(78, "💾 분석 결과 저장 중...", context)
-            
             analysis_data = {
                 'genre': analysis_result.get('genre', ''),
                 'reasoning': analysis_result.get('reasoning', ''),
@@ -105,7 +102,7 @@ class AIAnalysisStage(PipelineStage):
             
             self.db.save_analysis_result(context.video_id, analysis_data)
             
-            self.update_progress(80, "✅ AI 분석 완료", context)
+            self.update_progress(100, "✅ AI 분석 완료", context)
         else:
             self.update_progress(80, "⚠️ AI 분석 결과가 없습니다", context)
         
