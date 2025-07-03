@@ -20,24 +20,33 @@ def init_session_state():
             current_session = get_current_session()
             st.session_state.user_session = current_session
             
-            # VideoService 초기화는 나중에 지연 로딩
-            if 'video_service' not in st.session_state:
-                # 여기서 import하여 순환 참조 방지
-                from core.workflow.coordinator import VideoProcessor
-                
-                # 환경변수에서 AI Provider 읽기
-                ai_provider = os.getenv("AI_PROVIDER", "openai")
-                
-                # VideoProcessor 초기화
-                st.session_state.video_service = VideoProcessor(ai_provider=ai_provider)
-                st.session_state.ai_provider = ai_provider
-            
-            st.session_state.session_initialized = True
             logger.info(f"세션 초기화 완료: {current_session.session_id[:8]}...")
             
         except Exception as e:
             logger.error(f"세션 초기화 실패: {e}")
             st.error(f"세션 초기화 중 오류가 발생했습니다: {e}")
+    
+    # VideoService 초기화는 나중에 지연 로딩
+    if 'video_service' not in st.session_state:
+        try:
+            # 여기서 import하여 순환 참조 방지
+            from core.workflow.coordinator import VideoProcessor
+            
+            # 환경변수에서 AI Provider 읽기
+            ai_provider = os.getenv("AI_PROVIDER", "openai")
+            
+            # VideoProcessor 초기화
+            st.session_state.video_service = VideoProcessor(ai_provider=ai_provider)
+            st.session_state.ai_provider = ai_provider
+            
+            st.session_state.session_initialized = True
+            logger.info(f"VideoService 초기화 완료: {ai_provider}")
+            
+        except Exception as e:
+            logger.error(f"VideoService 초기화 실패: {e}")
+            # 대체 서비스 제공 (기본 기능은 유지)
+            st.session_state.video_service = None
+            st.session_state.ai_provider = "openai"
     
     # 처리 이력
     if 'processing_history' not in st.session_state:

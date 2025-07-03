@@ -19,7 +19,17 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
     """
     
     try:
-        # VideoService 가져오기 (Pipeline 기반)
+        # VideoService 가져오기 - 오류 처리 강화
+        if 'video_service' not in st.session_state or st.session_state.video_service is None:
+            console_callback("⚠️ VideoService가 초기화되지 않았습니다. 재초기화 시도...")
+            
+            # 세션 상태 재초기화 시도
+            from web.state import init_session_state
+            init_session_state()
+            
+            if 'video_service' not in st.session_state or st.session_state.video_service is None:
+                raise RuntimeError("VideoService 초기화에 실패했습니다. 페이지를 새로고침하세요.")
+        
         video_service = st.session_state.video_service
         
         # 정밀도 레벨 환경변수 설정

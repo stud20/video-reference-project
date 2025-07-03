@@ -210,7 +210,7 @@ class RedisCache:
         self.available = False
         
         if not REDIS_AVAILABLE:
-            logger.warning("Redis 라이브러리가 설치되지 않음 - Redis 캐시 비활성화")
+            logger.info("Redis 라이브러리가 설치되지 않음 - 메모리 캐시만 사용")
             return
         
         try:
