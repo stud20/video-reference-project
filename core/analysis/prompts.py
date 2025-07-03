@@ -30,7 +30,7 @@ class PromptBuilder:
     
     def __init__(self, config_path: Optional[str] = None):
         self.logger = get_logger(__name__)
-        self.config_path = config_path or "config/prompts/prompt_settings.json"  # 경로 수정
+        self.config_path = config_path or "config/prompt_settings.json"  # 경로 수정
         
         # 설정 로드
         self._load_config()
@@ -119,6 +119,8 @@ class PromptBuilder:
         Returns:
             생성된 프롬프트 문자열
         """
+        # 프롬프트 생성 전에 최신 설정 다시 로드
+        self._load_config()
         # 메타데이터 정보 구성
         metadata_lines = self._build_metadata_section(context)
         

@@ -52,7 +52,7 @@ class ResponseParser:
     
     def _load_custom_settings(self):
         """커스텀 프롬프트 설정 로드"""
-        settings_file = "config/prompts/prompt_settings.json"
+        settings_file = "config/prompt_settings.json"
         
         # 기본 분석 항목
         self.analysis_items = [
@@ -138,7 +138,14 @@ class ResponseParser:
             self.logger.error(f"응답이 너무 짧거나 비어있음: {len(response) if response else 0}자")
             return None
         
+        # 파싱 전에 최신 설정 다시 로드
+        self._load_custom_settings()
+        self.patterns = self._build_patterns()
+        
         self.logger.info("📝 응답 파싱 시작...")
+        self.logger.debug(f"📊 로드된 분석 항목 개수: {len(self.analysis_items)}")
+        self.logger.debug(f"📊 첫 번째 항목: {self.analysis_items[0] if self.analysis_items else 'None'}")
+        self.logger.debug(f"📊 응답 길이: {len(response)}자")
         
         # 여러 파싱 전략 시도
         result = None
@@ -359,9 +366,12 @@ class ResponseParser:
         """파싱 결과 유효성 검사"""
         # 필수 필드 확인
         if result.genre == "Unknown" or not result.genre:
+            self.logger.warning(f"⚠️ 장르 정보 부족: '{result.genre}'")
             return False
         
         if result.reason == "분석 내용 없음" or len(result.reason) < 20:
+            self.logger.warning(f"⚠️ 이유 설명 부족: {len(result.reason)}자")
             return False
         
+        self.logger.info(f"✅ 파싱 결과 유효성 검사 통과: 장르={result.genre}, 이유={len(result.reason)}자")
         return True
