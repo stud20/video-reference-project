@@ -1,5 +1,5 @@
 # core/analysis/parser.py
-"""AI 응답 파싱 모듈"""
+"""AI 응답 파싱 모듈 - 간단하고 효과적인 버전"""
 
 import re
 import json
@@ -43,162 +43,62 @@ class ResponseParser:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        
-        # 커스텀 프롬프트 설정 로드
-        self._load_custom_settings()
-        
-        # 파싱 패턴들
-        self.patterns = self._build_patterns()
-    
-    def _load_custom_settings(self):
-        """커스텀 프롬프트 설정 로드"""
-        settings_file = "config/prompt_settings.json"
-        
-        # 기본 분석 항목
-        self.analysis_items = [
-            {"label": "A1", "field": "genre"},
-            {"label": "A2", "field": "reason"},
-            {"label": "A3", "field": "features"},
-            {"label": "A4", "field": "tags"},
-            {"label": "A5", "field": "format_type"},
-            {"label": "A6", "field": "mood"},
-            {"label": "A7", "field": "target_audience"}
-        ]
-        
-        if os.path.exists(settings_file):
-            try:
-                with open(settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                
-                # 분석 항목이 있으면 매핑 업데이트
-                if 'analysis_items' in settings:
-                    custom_items = settings['analysis_items']
-                    
-                    # 레이블과 필드 매핑 업데이트
-                    for i, item in enumerate(custom_items[:7]):  # 최대 7개 항목
-                        if i < len(self.analysis_items):
-                            self.analysis_items[i]["label"] = item.get("label", f"A{i+1}")
-                            # 제목에서 필드 타입 추정 (선택사항)
-                            title = item.get("title", "").lower()
-                            if "장르" in title:
-                                self.analysis_items[i]["field"] = "genre"
-                            elif "이유" in title or "판단" in title:
-                                self.analysis_items[i]["field"] = "reason"
-                            elif "특징" in title or "특이" in title:
-                                self.analysis_items[i]["field"] = "features"
-                            elif "태그" in title or "키워드" in title:
-                                self.analysis_items[i]["field"] = "tags"
-                            elif "표현" in title or "형식" in title:
-                                self.analysis_items[i]["field"] = "format_type"
-                            elif "분위기" in title or "톤" in title:
-                                self.analysis_items[i]["field"] = "mood"
-                            elif "타겟" in title or "고객" in title:
-                                self.analysis_items[i]["field"] = "target_audience"
-                
-                self.logger.info("✅ 커스텀 파싱 설정 로드 완료")
-                
-            except Exception as e:
-                self.logger.error(f"커스텀 설정 로드 실패: {str(e)}")
-    
-    def _build_patterns(self) -> Dict[str, Dict[str, str]]:
-        """동적 파싱 패턴 생성"""
-        labeled_patterns = {}
-        
-        # 커스텀 레이블 기반 패턴 생성
-        for i, item in enumerate(self.analysis_items):
-            label = item["label"]
-            field = item["field"]
-            
-            # 다음 레이블까지 또는 끝까지 매칭
-            if i < len(self.analysis_items) - 1:
-                next_label = self.analysis_items[i + 1]["label"]
-                pattern = rf'{label}[.\s]*[:：]?\s*(.+?)(?={next_label}|$)'
-            else:
-                pattern = rf'{label}[.\s]*[:：]?\s*(.+?)(?=$)'
-            
-            labeled_patterns[field] = pattern
-        
-        return {
-            'labeled': labeled_patterns,
-            'section': {
-                'sections': r'(?:^|\n\n)(.+?)(?=\n\n|$)'
-            }
-        }
     
     def parse(self, response: str) -> Optional[ParsedAnalysis]:
-        """AI 응답 파싱
-        
-        Args:
-            response: AI의 원본 응답 텍스트
-            
-        Returns:
-            파싱된 분석 결과 또는 None
-        """
+        """AI 응답 파싱"""
         if not response or len(response) < 100:
             self.logger.error(f"응답이 너무 짧거나 비어있음: {len(response) if response else 0}자")
             return None
         
-        # 파싱 전에 최신 설정 다시 로드
-        self._load_custom_settings()
-        self.patterns = self._build_patterns()
-        
         self.logger.info("📝 응답 파싱 시작...")
-        self.logger.debug(f"📊 로드된 분석 항목 개수: {len(self.analysis_items)}")
-        self.logger.debug(f"📊 첫 번째 항목: {self.analysis_items[0] if self.analysis_items else 'None'}")
-        self.logger.debug(f"📊 응답 길이: {len(response)}자")
         
-        # 여러 파싱 전략 시도
-        result = None
-        
-        # 1. 레이블 기반 파싱 시도 (커스텀 레이블 사용)
-        result = self._parse_labeled_format(response)
-        if result and self._validate_result(result):
-            self.logger.info("✅ 레이블 형식 파싱 성공")
-            return result
-        
-        # 2. 섹션 기반 파싱 시도 (빈 줄로 구분)
-        result = self._parse_section_format(response)
-        if result and self._validate_result(result):
-            self.logger.info("✅ 섹션 형식 파싱 성공")
-            return result
-        
-        # 3. 자유 형식 파싱 시도 (키워드 기반)
-        result = self._parse_free_format(response)
-        if result and self._validate_result(result):
-            self.logger.info("✅ 자유 형식 파싱 성공")
-            return result
-        
-        # 4. 최소한의 정보라도 추출
-        self.logger.warning("⚠️ 정교한 파싱 실패, 기본 파싱 시도")
-        return self._parse_minimal(response)
-    
-    def _parse_labeled_format(self, response: str) -> Optional[ParsedAnalysis]:
-        """레이블 형식 파싱 (커스텀 레이블 지원)"""
         try:
             result = ParsedAnalysis(raw_response=response)
             
-            # 각 필드 추출
-            for field, pattern in self.patterns['labeled'].items():
+            # A1-A7 패턴으로 직접 파싱
+            patterns = {
+                'genre': r'A1[.\s]*[:：]?\s*(.+?)(?=\n\s*A2|$)',
+                'reason': r'A2[.\s]*[:：]?\s*(.+?)(?=\n\s*A3|$)',
+                'features': r'A3[.\s]*[:：]?\s*(.+?)(?=\n\s*A4|$)',
+                'tags': r'A4[.\s]*[:：]?\s*(.+?)(?=\n\s*A5|$)',
+                'format_type': r'A5[.\s]*[:：]?\s*(.+?)(?=\n\s*A6|$)',
+                'mood': r'A6[.\s]*[:：]?\s*(.+?)(?=\n\s*A7|$)',
+                'target_audience': r'A7[.\s]*[:：]?\s*(.+?)$'
+            }
+            
+            # 각 패턴 매칭
+            for field, pattern in patterns.items():
                 match = re.search(pattern, response, re.MULTILINE | re.DOTALL)
                 if match:
                     value = match.group(1).strip()
                     
                     if field == 'tags':
-                        # 태그는 리스트로 변환
-                        result.tags = self._parse_tags(value)
+                        # 태그는 쉼표로 분리
+                        tag_list = [tag.strip() for tag in value.split(',') if tag.strip()]
+                        result.tags = tag_list[:20]  # 최대 20개
+                        self.logger.debug(f"✅ 태그 {len(result.tags)}개 파싱됨")
                     else:
-                        setattr(result, field, self._clean_text(value))
+                        setattr(result, field, value)
+                        self.logger.debug(f"✅ {field} 파싱됨: {value[:50]}...")
+                else:
+                    self.logger.warning(f"⚠️ {field} 매칭 실패")
             
-            return result
-            
+            # 결과 유효성 검증
+            if self._validate_result(result):
+                self.logger.info("✅ 파싱 성공")
+                return result
+            else:
+                # 섹션 기반 파싱 시도
+                self.logger.info("🔄 섹션 기반 파싱 시도")
+                return self._parse_section_format(response)
+                
         except Exception as e:
-            self.logger.error(f"레이블 형식 파싱 오류: {str(e)}")
-            return None
+            self.logger.error(f"파싱 오류: {str(e)}")
+            return self._parse_minimal(response)
     
     def _parse_section_format(self, response: str) -> Optional[ParsedAnalysis]:
-        """섹션 형식 파싱 (빈 줄로 구분)"""
+        """섹션 기반 파싱 (빈 줄로 구분)"""
         try:
-            # 빈 줄로 섹션 분리
             sections = []
             current_section = []
             
@@ -213,165 +113,89 @@ class ResponseParser:
             if current_section:
                 sections.append('\n'.join(current_section))
             
-            if len(sections) < 4:  # 최소 4개 섹션 필요
+            if len(sections) < 4:
                 return None
             
+            result = ParsedAnalysis(raw_response=response)
+            
             # 섹션을 순서대로 매핑
-            result = ParsedAnalysis(raw_response=response)
+            fields = ['genre', 'reason', 'features', 'tags', 'format_type', 'mood', 'target_audience']
             
-            # 커스텀 항목 순서에 따라 매핑
             for i, section in enumerate(sections):
-                if i < len(self.analysis_items):
-                    field = self.analysis_items[i]["field"]
+                if i < len(fields):
+                    field = fields[i]
+                    clean_section = self._clean_section(section)
                     
-                    if field == "tags":
-                        result.tags = self._parse_tags(section)
-                    elif field in ["genre", "format_type"]:
-                        setattr(result, field, self._extract_first_line(section))
+                    if field == 'tags':
+                        tag_list = [tag.strip() for tag in clean_section.replace(',', ' ').split() if tag.strip()]
+                        result.tags = tag_list[:20]
+                    elif field in ['genre', 'format_type']:
+                        # 첫 줄만 추출
+                        result.__dict__[field] = clean_section.split('\n')[0].strip()
                     else:
-                        setattr(result, field, self._clean_text(section))
+                        result.__dict__[field] = clean_section
             
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"섹션 형식 파싱 오류: {str(e)}")
-            return None
-    
-    def _parse_free_format(self, response: str) -> Optional[ParsedAnalysis]:
-        """자유 형식 파싱 (키워드 기반)"""
-        try:
-            result = ParsedAnalysis(raw_response=response)
-            
-            # 장르 찾기
-            genre_keywords = ["장르", "분류", "카테고리", "타입", "유형"]
-            for keyword in genre_keywords:
-                pattern = rf'{keyword}[:\s]*([^\n]+)'
-                match = re.search(pattern, response, re.IGNORECASE)
-                if match:
-                    result.genre = self._extract_first_line(match.group(1))
-                    break
-            
-            # 태그 찾기
-            tag_keywords = ["태그", "키워드", "관련어", "연관어"]
-            for keyword in tag_keywords:
-                pattern = rf'{keyword}[:\s]*([^\n]+(?:\n[^\n]+)*)'
-                match = re.search(pattern, response, re.IGNORECASE)
-                if match:
-                    result.tags = self._parse_tags(match.group(1))
-                    break
-            
-            # 나머지 필드는 텍스트의 순서와 길이로 추정
-            lines = [line.strip() for line in response.split('\n') if line.strip()]
-            
-            # 긴 텍스트를 이유와 특징으로 분류
-            long_texts = [line for line in lines if len(line) > 100]
-            if len(long_texts) >= 2:
-                result.reason = long_texts[0]
-                result.features = long_texts[1]
-            elif len(long_texts) == 1:
-                result.reason = long_texts[0]
-                result.features = "분석 내용 없음"
-            
-            return result
+            return result if self._validate_result(result) else None
             
         except Exception as e:
-            self.logger.error(f"자유 형식 파싱 오류: {str(e)}")
+            self.logger.error(f"섹션 파싱 오류: {str(e)}")
             return None
     
     def _parse_minimal(self, response: str) -> ParsedAnalysis:
         """최소한의 정보 추출"""
         result = ParsedAnalysis(raw_response=response)
         
-        # 첫 줄을 장르로 가정
+        # 첫 줄을 장르로 추정
         lines = [line.strip() for line in response.split('\n') if line.strip()]
         if lines:
-            result.genre = self._extract_first_line(lines[0])
+            result.genre = self._extract_genre_from_line(lines[0])
         
         # 전체 텍스트를 이유로 사용
         result.reason = response[:500] + "..." if len(response) > 500 else response
         
-        # 태그 추출 시도
-        result.tags = self._extract_potential_tags(response)
+        # 간단한 태그 추출
+        result.tags = self._extract_simple_tags(response)
         
         return result
     
-    def _parse_tags(self, text: str) -> List[str]:
-        """태그 텍스트를 리스트로 변환"""
-        # 여러 구분자 처리
-        delimiters = [',', '/', '#', '·', '|', '\n']
-        
-        # 가장 많이 사용된 구분자 찾기
-        delimiter_counts = {d: text.count(d) for d in delimiters}
-        main_delimiter = max(delimiter_counts, key=delimiter_counts.get)
-        
-        if delimiter_counts[main_delimiter] == 0:
-            # 구분자가 없으면 공백으로 분리
-            tags = text.split()
-        else:
-            tags = text.split(main_delimiter)
-        
-        # 정리
-        cleaned_tags = []
-        for tag in tags:
-            tag = tag.strip()
-            # 특수문자 제거
-            tag = re.sub(r'^[#\-\*\·\s]+', '', tag)
-            tag = re.sub(r'[#\-\*\·\s]+$', '', tag)
-            
-            if tag and len(tag) > 1 and len(tag) < 50:
-                cleaned_tags.append(tag)
-        
-        return cleaned_tags[:20]  # 최대 20개
+    def _clean_section(self, section: str) -> str:
+        """섹션 텍스트 정리"""
+        # A1., A2. 등의 레이블 제거
+        section = re.sub(r'^A\d+[.\s]*[:：]?\s*', '', section.strip())
+        return section.strip()
     
-    def _extract_potential_tags(self, text: str) -> List[str]:
-        """텍스트에서 잠재적인 태그 추출"""
-        # 한글 단어 추출 (2-10자)
+    def _extract_genre_from_line(self, line: str) -> str:
+        """줄에서 장르 추출"""
+        line = self._clean_section(line)
+        # 첫 50자만 반환
+        return line[:50] if len(line) > 50 else line
+    
+    def _extract_simple_tags(self, text: str) -> List[str]:
+        """간단한 태그 추출"""
+        # 한글 단어만 추출 (2-10자)
         korean_words = re.findall(r'[가-힣]{2,10}', text)
         
-        # 빈도수 계산
+        # 빈도수 계산 및 정리
         word_freq = {}
+        exclude_words = {'영상', '분석', '이미지', '내용', '경우', '있습니다', '있으며', '활용하여', '특징을'}
+        
         for word in korean_words:
-            if word not in ['영상', '분석', '이미지', '내용', '경우']:
+            if word not in exclude_words:
                 word_freq[word] = word_freq.get(word, 0) + 1
         
-        # 빈도순 정렬
+        # 빈도순 정렬하여 상위 10개 반환
         sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
-        
         return [word for word, freq in sorted_words[:10]]
-    
-    def _clean_text(self, text: str) -> str:
-        """텍스트 정리"""
-        # 커스텀 레이블 패턴 제거
-        for item in self.analysis_items:
-            label = item["label"]
-            text = re.sub(rf'^{label}[.\s]*[:：]?\s*', '', text.strip())
-        
-        # 앞뒤 특수문자 제거
-        text = re.sub(r'^[-\*\·\s]+', '', text)
-        text = re.sub(r'[-\*\·\s]+$', '', text)
-        
-        return text.strip()
-    
-    def _extract_first_line(self, text: str) -> str:
-        """첫 줄 또는 짧은 텍스트 추출"""
-        text = self._clean_text(text)
-        
-        # 첫 줄만 추출 (장르나 형식 같은 짧은 답변용)
-        first_line = text.split('\n')[0].strip()
-        
-        # 너무 길면 첫 50자만
-        return first_line[:50] if len(first_line) > 50 else first_line
     
     def _validate_result(self, result: ParsedAnalysis) -> bool:
         """파싱 결과 유효성 검사"""
-        # 필수 필드 확인
         if result.genre == "Unknown" or not result.genre:
-            self.logger.warning(f"⚠️ 장르 정보 부족: '{result.genre}'")
+            self.logger.warning("⚠️ 장르 정보 부족")
             return False
         
         if result.reason == "분석 내용 없음" or len(result.reason) < 20:
-            self.logger.warning(f"⚠️ 이유 설명 부족: {len(result.reason)}자")
+            self.logger.warning("⚠️ 이유 설명 부족")
             return False
         
-        self.logger.info(f"✅ 파싱 결과 유효성 검사 통과: 장르={result.genre}, 이유={len(result.reason)}자")
+        self.logger.info(f"✅ 파싱 검증 통과: 장르={result.genre}, 이유={len(result.reason)}자")
         return True
