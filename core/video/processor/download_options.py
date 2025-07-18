@@ -3,6 +3,8 @@
 
 import os
 
+
+
 class DownloadOptions:
     """다양한 품질 옵션 제공 - macOS 호환성 우선"""
     
@@ -25,35 +27,61 @@ class DownloadOptions:
                 'bv*[vcodec^=avc1]+ba/best'
             ),
             
-            # === 403 에러 방지 옵션 추가 ===
-            # User-Agent - 실제 브라우저처럼 보이게
-            'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # === 403 에러 + Player Response 에러 방지 옵션 ===
+            # User-Agent - 최신 Chrome 브라우저로 위장
+            'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             
             # 요청 간격 설정 - 차단 회피
-            'sleep_interval': 1,          # 최소 대기 시간 (초)
-            'max_sleep_interval': 5,      # 최대 대기 시간 (초)
-            'sleep_interval_requests': 1, # 요청 간 대기 시간
+            'sleep_interval': 2,          # 최소 대기 시간 증가
+            'max_sleep_interval': 8,      # 최대 대기 시간 증가
+            'sleep_interval_requests': 2, # 요청 간 대기 시간 증가
             
-            # 에러 처리
-            'ignoreerrors': False,        # 에러 발생 시 중단 (명확한 에러 확인용)
-            'retries': 3,                 # 재시도 횟수
-            'fragment_retries': 3,        # 프래그먼트 재시도
+            # 에러 처리 강화
+            'ignoreerrors': False,        
+            'retries': 5,                 # 재시도 횟수 증가
+            'fragment_retries': 5,        
+            'retry_sleep_functions': {    # 재시도 간격 설정
+                'http': lambda n: min(2 ** n, 10),
+                'fragment': lambda n: min(2 ** n, 10),
+            },
             
-            # 추가 헤더 설정
+            # YouTube 우회 전용 헤더
             'http_headers': {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'gzip, deflate, br, zstd',
                 'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"macOS"',
+            },
+            # Chrome 쿠키 자동 사용
+            'cookiesfrombrowser': ('chrome',),
+            
+            # Player Response 추출 관련 옵션
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],  # 여러 클라이언트 시도
+                    'player_skip': ['configs'],           # 설정 건너뛰기
+                    'include_live_dash': False,           # 라이브 스트림 제외
+                }
             },
             
-            # 쿠키 지원 (필요시)
-            # 'cookiefile': 'cookies.txt',  # 쿠키 파일이 있다면 주석 해제
+            # 네트워크 최적화
+            'concurrent_fragment_downloads': 1,  # 동시 다운로드 제한
+            'buffersize': 1024 * 16,            # 버퍼 크기 조정
             
-            # 지역 우회 (필요시)
-            # 'geo_bypass': True,
+            # 수동 쿠키 파일 사용 (대안)
+            # 'cookiefile': 'cookies.txt',
+            
+            # 지역 우회
+            'geo_bypass': True,
             # 'geo_bypass_country': 'US',
             
             # === 기존 옵션들 ===
