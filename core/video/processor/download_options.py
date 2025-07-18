@@ -11,7 +11,7 @@ class DownloadOptions:
     
     @staticmethod
     def get_best_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """최고 품질 MP4 다운로드 옵션 - H.264 우선"""
+        """최고 품질 MP4 다운로드 옵션 - H.264 우선 + 403 에러 방지"""
         return {
             'outtmpl': output_path,
             
@@ -25,6 +25,38 @@ class DownloadOptions:
                 'bv*[vcodec^=avc1]+ba/best'
             ),
             
+            # === 403 에러 방지 옵션 추가 ===
+            # User-Agent - 실제 브라우저처럼 보이게
+            'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            
+            # 요청 간격 설정 - 차단 회피
+            'sleep_interval': 1,          # 최소 대기 시간 (초)
+            'max_sleep_interval': 5,      # 최대 대기 시간 (초)
+            'sleep_interval_requests': 1, # 요청 간 대기 시간
+            
+            # 에러 처리
+            'ignoreerrors': False,        # 에러 발생 시 중단 (명확한 에러 확인용)
+            'retries': 3,                 # 재시도 횟수
+            'fragment_retries': 3,        # 프래그먼트 재시도
+            
+            # 추가 헤더 설정
+            'http_headers': {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
+            
+            # 쿠키 지원 (필요시)
+            # 'cookiefile': 'cookies.txt',  # 쿠키 파일이 있다면 주석 해제
+            
+            # 지역 우회 (필요시)
+            # 'geo_bypass': True,
+            # 'geo_bypass_country': 'US',
+            
+            # === 기존 옵션들 ===
             # 후처리 - H.264로 재인코딩
             'postprocessors': [
                 {
@@ -72,19 +104,13 @@ class DownloadOptions:
             'embedthumbnail': True,
             
             # 네트워크 설정
-            'retries': 5,
-            'fragment_retries': 10,
-            'continuedl': True,
+            'socket_timeout': 30,         # 소켓 타임아웃
+            'http_chunk_size': 10485760,  # 10MB 청크 (안정성)
             
-            # 기타 옵션
-            'quiet': False,
-            'no_warnings': False,
-            'ignoreerrors': False,
-            
-            # HTTP 헤더 (일부 사이트 필요)
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36'
-            }
+            # 디버깅 옵션 (필요시 활성화)
+            'verbose': False,
+            'quiet': True,
+            'no_warnings': True,
         }
     
     @staticmethod
