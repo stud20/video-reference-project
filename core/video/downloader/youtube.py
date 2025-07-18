@@ -126,7 +126,8 @@ class YouTubeDownloader(VideoFetcher):
         
         download_methods.extend([
             ("Safari 쿠키", lambda: self.download_options.get_safari_mp4_options(output_template)),
-            ("쿠키 없이", lambda: self.download_options.get_no_cookies_mp4_options(output_template))
+            ("쿠키 없이", lambda: self.download_options.get_no_cookies_mp4_options(output_template)),
+            ("최강 우회 모드", lambda: self.download_options.get_aggressive_bypass_options(output_template))
         ])
         
         downloaded_file = None
@@ -158,10 +159,9 @@ class YouTubeDownloader(VideoFetcher):
                     
             except Exception as e:
                 self.logger.warning(f"❌ {method_name} 방식 실패: {str(e)}")
-                # 마지막 방법 확인 (다름적 처리)
-                if (method_name == "쿠키 없이") or \
-                   (not cookies_file_exists and method_name == "Safari 쿠키" and len([m for m in download_methods if "Safari" in m[0]]) == 1):
-                    raise Exception(f"모든 다운로드 방법 실패. 마지막 에러: {str(e)}")
+                # 마지막 방법 확인
+                if method_name == "최강 우회 모드":
+                    raise Exception(f"모든 다운로드 방법 실패 (최강 우회 모드 포함). 마지막 에러: {str(e)}")
                 continue
         
         raise Exception("예상치 못한 오류: 모든 방법 시도 완료했으나 성공하지 못함")

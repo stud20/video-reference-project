@@ -12,6 +12,86 @@ class DownloadOptions:
     NON_PLAYABLE_CODECS = {"vp9", "vp8", "av1", "vp09", "vp08", "vp10"}
     
     @staticmethod
+    def get_aggressive_bypass_options(output_path: str, subtitle_langs: list = None) -> dict:
+        """최강 우회 옵션 - 모든 방어 기법 사용"""
+        return {
+            'outtmpl': output_path,
+            
+            # 기본 포맷
+            'format': 'best[ext=mp4]/best',
+            
+            # 최강 User-Agent 순환
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            
+            # 강화된 요청 간격
+            'sleep_interval': 5,
+            'max_sleep_interval': 15,
+            'sleep_interval_requests': 3,
+            
+            # 최대 재시도
+            'retries': 10,
+            'fragment_retries': 10,
+            'retry_sleep_functions': {
+                'http': lambda n: min(3 ** n, 30),
+                'fragment': lambda n: min(3 ** n, 30),
+            },
+            
+            # YouTube 우회 전용 설정
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web', 'tv_embedded', 'mweb'],
+                    'player_skip': ['configs', 'webpage', 'js'],
+                    'include_live_dash': False,
+                    'skip_hls': True,
+                    'skip_dash': False,
+                    'innertube_host': 'www.youtube.com',
+                    'innertube_key': None,
+                    'comment_sort': 'top',
+                    'max_comments': [0],
+                }
+            },
+            
+            # 추가 헤더
+            'http_headers': {
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Origin': 'https://www.youtube.com',
+                'Referer': 'https://www.youtube.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'X-YouTube-Client-Name': '1',
+                'X-YouTube-Client-Version': '2.20231201.01.00',
+            },
+            
+            # 네트워크 최적화
+            'concurrent_fragment_downloads': 1,
+            'buffersize': 1024 * 8,
+            'http_chunk_size': 1024 * 1024,
+            'socket_timeout': 60,
+            
+            # 지역 우회
+            'geo_bypass': True,
+            'geo_bypass_country': 'US',
+            
+            # 기타 설정
+            'no_warnings': False,
+            'ignoreerrors': False,
+            'extract_flat': False,
+            
+            # 추가 User-Agent 목록
+            'user_agent_list': [
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+                'Mozilla/5.0 (Android 12; Mobile; rv:107.0) Gecko/107.0 Firefox/107.0',
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+            ]
+        }
+    
+    @staticmethod
     def get_cookies_file_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
         """쿠키 파일 사용 옵션: cookies.txt 파일 사용"""
         options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
@@ -20,8 +100,20 @@ class DownloadOptions:
         if 'cookiesfrombrowser' in options:
             del options['cookiesfrombrowser']
         
-        # 쿠키 파일 설정
-        options['cookiefile'] = 'cookies.txt'
+        # 쿠키 파일 설정 - 절대 경로 및 상대 경로 모두 시도
+        cookie_paths = ['cookies.txt', '/app/cookies.txt', './cookies.txt']
+        cookie_file = None
+        
+        for path in cookie_paths:
+            if os.path.exists(path):
+                cookie_file = path
+                break
+                
+        if cookie_file:
+            options['cookiefile'] = cookie_file
+        else:
+            # 파일이 없으면 기본값 사용
+            options['cookiefile'] = 'cookies.txt'
         
         return options
     
