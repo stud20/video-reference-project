@@ -97,6 +97,75 @@ class YouTubeDownloader(VideoFetcher):
 
 
 
+    def _download_with_fallback(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
+        """순차적 다운로드 시도: Chrome -> 쿠키파일 -> Safari -> 쿠키없이"""
+        
+        # 기본 옵션 함수 선택
+        if quality_option == "fast":
+            base_options_func = self.download_options.get_fast_mp4_options
+        elif quality_option == "balanced":
+            base_options_func = self.download_options.get_balanced_mp4_options
+        else:  # best
+            base_options_func = self.download_options.get_best_mp4_options
+        
+        # 쿠키 파일 존재 확인
+        cookies_file_exists = os.path.exists('cookies.txt')
+        if cookies_file_exists:
+            self.logger.info("🍪 cookies.txt 파일 발견!")
+        else:
+            self.logger.warning("⚠️ cookies.txt 파일을 찾을 수 없음")
+        
+        # 다운로드 방법들 정의 (쿠키 파일 조건부 추가)
+        download_methods = [
+            ("Chrome 쿠키", lambda: base_options_func(output_template))
+        ]
+        
+        # 쿠키 파일이 있으면 두 번째로 시도
+        if cookies_file_exists:
+            download_methods.append(("쿠키 파일 (cookies.txt)", lambda: self.download_options.get_cookies_file_mp4_options(output_template)))
+        
+        download_methods.extend([
+            ("Safari 쿠키", lambda: self.download_options.get_safari_mp4_options(output_template)),
+            ("쿠키 없이", lambda: self.download_options.get_no_cookies_mp4_options(output_template))
+        ])
+        
+        downloaded_file = None
+        info = None
+        
+        for method_name, get_options in download_methods:
+            try:
+                self.logger.info(f"🔄 {method_name} 방식으로 시도 중...")
+                ydl_opts = get_options()
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    downloaded_file = ydl.prepare_filename(info)
+                    
+                    # 확장자 확인
+                    if not os.path.exists(downloaded_file):
+                        base_name = os.path.splitext(downloaded_file)[0]
+                        for ext in ['.mp4', '.webm', '.mkv', '.mov']:
+                            test_file = base_name + ext
+                            if os.path.exists(test_file):
+                                downloaded_file = test_file
+                                break
+                
+                if os.path.exists(downloaded_file):
+                    self.logger.info(f"✅ {method_name} 방식으로 다운로드 성공!")
+                    return downloaded_file, info
+                else:
+                    raise FileNotFoundError("다운로드된 파일을 찾을 수 없음")
+                    
+            except Exception as e:
+                self.logger.warning(f"❌ {method_name} 방식 실패: {str(e)}")
+                # 마지막 방법 확인 (다름적 처리)
+                if (method_name == "쿠키 없이") or \
+                   (not cookies_file_exists and method_name == "Safari 쿠키" and len([m for m in download_methods if "Safari" in m[0]]) == 1):
+                    raise Exception(f"모든 다운로드 방법 실패. 마지막 에러: {str(e)}")
+                continue
+        
+        raise Exception("예상치 못한 오류: 모든 방법 시도 완료했으나 성공하지 못함")
+
     def download(self, video: Video, progress_callback: Optional[Callable] = None) -> Tuple[str, VideoMetadata]:
         """
         비디오 다운로드 - 메타데이터 추출 및 macOS 호환성 보장
@@ -129,38 +198,14 @@ class YouTubeDownloader(VideoFetcher):
             # 비디오 파일명을 {video_id}_제목.mp4 형식으로 변경
             output_template = os.path.join(output_dir, f'{video_id}_{safe_title}.%(ext)s')
             
-            # 4. 다운로드 옵션 설정 (macOS 호환 H.264 우선)
+            # 4. 다운로드 옵션 설정 및 순차 시도
             quality_option = os.getenv("VIDEO_QUALITY", "best")
-            
-            if quality_option == "fast":
-                ydl_opts = self.download_options.get_fast_mp4_options(output_template)
-            elif quality_option == "balanced":
-                ydl_opts = self.download_options.get_balanced_mp4_options(output_template)
-            else:  # best
-                ydl_opts = self.download_options.get_best_mp4_options(output_template)
             
             self.logger.info(f"📥 다운로드 시작: {url} (품질: {quality_option})")
             self.logger.info(f"📁 저장 위치: {output_dir}")
-            # progress_callback 제거
             
-            # 5. 다운로드 실행
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                
-                # 실제 다운로드된 파일 경로 찾기
-                downloaded_file = ydl.prepare_filename(info)
-                
-                # 확장자가 변경되었을 수 있으므로 확인
-                if not os.path.exists(downloaded_file):
-                    base_name = os.path.splitext(downloaded_file)[0]
-                    for ext in ['.mp4', '.webm', '.mkv', '.mov']:
-                        test_file = base_name + ext
-                        if os.path.exists(test_file):
-                            downloaded_file = test_file
-                            break
-            
-            if not os.path.exists(downloaded_file):
-                raise FileNotFoundError(f"다운로드된 파일을 찾을 수 없습니다: {downloaded_file}")
+            # 5. 순차적 다운로드 시도 (Chrome -> Safari -> 쿠키없이)
+            downloaded_file, info = self._download_with_fallback(url, output_template, quality_option)
             
             # 6. macOS 호환성 확인 및 필요시 재인코딩
             self.logger.info("🎥 macOS 호환성 확인 중...")

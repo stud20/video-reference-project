@@ -12,6 +12,66 @@ class DownloadOptions:
     NON_PLAYABLE_CODECS = {"vp9", "vp8", "av1", "vp09", "vp08", "vp10"}
     
     @staticmethod
+    def get_cookies_file_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
+        """쿠키 파일 사용 옵션: cookies.txt 파일 사용"""
+        options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
+        
+        # 브라우저 쿠키 옵션 제거
+        if 'cookiesfrombrowser' in options:
+            del options['cookiesfrombrowser']
+        
+        # 쿠키 파일 설정
+        options['cookiefile'] = 'cookies.txt'
+        
+        return options
+    
+    @staticmethod
+    def get_safari_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
+        """대체 옵션: Safari 쿠키 사용"""
+        options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
+        
+        # Chrome 쿠키를 Safari로 대체
+        options['cookiesfrombrowser'] = ('safari',)
+        
+        return options
+    
+    @staticmethod
+    def get_no_cookies_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
+        """쿠키 없이 다운로드 시도 - Player Response 에러 회피"""
+        options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
+        
+        # 쿠키 옵션 제거
+        if 'cookiesfrombrowser' in options:
+            del options['cookiesfrombrowser']
+        if 'cookiefile' in options:
+            del options['cookiefile']
+            
+        # 더 방어적인 설정
+        options.update({
+            'sleep_interval': 3,
+            'max_sleep_interval': 10,
+            'retries': 10,
+            'fragment_retries': 10,
+            
+            # 추가 Player Response 회피 옵션
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web', 'tv_embedded'],
+                    'player_skip': ['configs', 'webpage'],
+                    'include_live_dash': False,
+                    'skip_hls': True,
+                }
+            },
+            
+            # 더 많은 User-Agent 순환
+            'user_agent_list': [
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
+                'Mozilla/5.0 (Android 11; Mobile; rv:91.0) Gecko/91.0 Firefox/91.0',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            ]
+        })
+        
+        return options
     def get_best_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
         """최고 품질 MP4 다운로드 옵션 - H.264 우선 + 403 에러 방지"""
         return {
@@ -61,8 +121,10 @@ class DownloadOptions:
                 'sec-ch-ua-mobile': '?0',
                 'sec-ch-ua-platform': '"macOS"',
             },
-            # Chrome 쿠키 자동 사용
-            'cookiesfrombrowser': ('chrome',),
+            # 쿠키 설정 - Chrome 우선 시도
+            'cookiesfrombrowser': ('chrome',),   # Chrome 쿠키 우선 사용
+            # 'cookiesfrombrowser': ('safari',),   # Chrome 실패 시 Safari 대체
+            # 'cookiefile': 'cookies.txt',         # 수동 쿠키 파일
             
             # Player Response 추출 관련 옵션
             'extractor_args': {
