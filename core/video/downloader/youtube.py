@@ -108,12 +108,15 @@ class YouTubeDownloader(VideoFetcher):
         else:  # best
             base_options_func = self.download_options.get_best_mp4_options
         
-        # 쿠키 파일 존재 확인
-        cookies_file_exists = os.path.exists('cookies.txt')
+        # 쿠키 파일 존재 확인 - 프로젝트 루트 경로에서 확인
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cookies_file_path = os.path.join(project_root, 'cookies.txt')
+        cookies_file_exists = os.path.exists(cookies_file_path)
+        
         if cookies_file_exists:
-            self.logger.info("🍪 cookies.txt 파일 발견!")
+            self.logger.info(f"🍪 cookies.txt 파일 발견! 경로: {cookies_file_path}")
         else:
-            self.logger.warning("⚠️ cookies.txt 파일을 찾을 수 없음")
+            self.logger.warning(f"⚠️ cookies.txt 파일을 찾을 수 없음: {cookies_file_path}")
         
         # 다운로드 방법들 정의 (쿠키 파일 조건부 추가)
         download_methods = [

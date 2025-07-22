@@ -100,8 +100,15 @@ class DownloadOptions:
         if 'cookiesfrombrowser' in options:
             del options['cookiesfrombrowser']
         
-        # 쿠키 파일 설정 - 절대 경로 및 상대 경로 모두 시도
-        cookie_paths = ['cookies.txt', '/app/cookies.txt', './cookies.txt']
+        # 쿠키 파일 설정 - 프로젝트 루트부터 확인
+        import os
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cookie_paths = [
+            os.path.join(project_root, 'cookies.txt'),  # 프로젝트 루트
+            'cookies.txt',  # 현재 디렉토리
+            '/app/cookies.txt',  # Docker 환경
+            './cookies.txt'  # 상대 경로
+        ]
         cookie_file = None
         
         for path in cookie_paths:
@@ -111,9 +118,11 @@ class DownloadOptions:
                 
         if cookie_file:
             options['cookiefile'] = cookie_file
+            print(f"🍪 쿠키 파일 사용: {cookie_file}")
         else:
             # 파일이 없으면 기본값 사용
             options['cookiefile'] = 'cookies.txt'
+            print("⚠️ 쿠키 파일을 찾을 수 없어 기본값 사용")
         
         return options
     
@@ -164,6 +173,7 @@ class DownloadOptions:
         })
         
         return options
+    @staticmethod
     def get_best_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
         """최고 품질 MP4 다운로드 옵션 - H.264 우선 + 403 에러 방지"""
         return {
