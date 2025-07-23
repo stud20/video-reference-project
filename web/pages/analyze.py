@@ -179,6 +179,9 @@ def render_input_section():
         render_version_history()
     
     if analyze_button and video_url:
+        # 분석 시작 시 상태 초기화
+        if 'use_custom_prompt' in st.session_state:
+            del st.session_state.use_custom_prompt
         set_analysis_state('processing')
         st.session_state.current_video_url = video_url
         st.session_state.selected_model = model_selection[0]

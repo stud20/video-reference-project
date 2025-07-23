@@ -14,3 +14,11 @@ def reset_analysis_state():
     st.session_state.show_precision_modal = False
     if 'moodboard_selected' in st.session_state:
         del st.session_state.moodboard_selected
+    
+    # 체크박스 상태 초기화
+    if 'use_custom_prompt' in st.session_state:
+        del st.session_state.use_custom_prompt
+    if 'use_custom_prompt_new' in st.session_state:
+        del st.session_state.use_custom_prompt_new
+    if 'custom_analysis_prompt' in st.session_state:
+        del st.session_state.custom_analysis_prompt
