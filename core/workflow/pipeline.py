@@ -25,6 +25,7 @@ class PipelineContext:
     # 입력 데이터
     url: str
     force_reanalyze: bool = False
+    custom_prompt: Optional[str] = None
     
     # 처리 중 생성되는 데이터
     platform: Optional[str] = None
@@ -121,14 +122,16 @@ class VideoPipeline:
     def execute(self, 
                url: str, 
                force_reanalyze: bool = False,
-               progress_callback: Optional[Callable] = None) -> PipelineContext:
+               progress_callback: Optional[Callable] = None,
+               custom_prompt: Optional[str] = None) -> PipelineContext:
         """파이프라인 실행"""
         self.progress_callback = progress_callback
         
         # 컨텍스트 생성
         context = PipelineContext(
             url=url,
-            force_reanalyze=force_reanalyze
+            force_reanalyze=force_reanalyze,
+            custom_prompt=custom_prompt
         )
         
         self.logger.info("=" * 60)
