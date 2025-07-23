@@ -10,6 +10,7 @@ from core.handlers import handle_video_analysis_enhanced
 from web.state import get_analysis_state, set_analysis_state
 from utils.logger import get_logger
 from web.components.analyze import render_results_section, render_modals
+from web.components.analyze.custom_prompt import render_custom_analysis_prompt
 from web.utils.analysis_state import reset_analysis_state
 
 logger = get_logger(__name__)
@@ -152,6 +153,15 @@ def render_input_section():
             )
     
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Phase 1: 맞춤형 분석 프롬프트 컴포넌트
+    if video_url:  # URL이 입력된 경우에만 표시
+        st.markdown("---")
+        custom_prompt = render_custom_analysis_prompt()
+        if custom_prompt:
+            st.session_state.custom_analysis_prompt = custom_prompt
+        st.markdown("---")
+    
     render_version_history()
     
     if analyze_button and video_url:
