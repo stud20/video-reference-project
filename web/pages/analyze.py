@@ -215,7 +215,10 @@ def render_processing_section():
         elapsed_time = st.empty()
         estimated_time = st.empty()
     
-    # 실시간 콘솔 로그
+    # 프로그레스 바와 실시간 로그 사이 간격
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 실시간 콘솔 로그 (프로그레스 바 바로 아래)
     st.markdown("#### 💻 실시간 로그")
     console_placeholder = st.empty()
     
