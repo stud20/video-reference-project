@@ -338,6 +338,17 @@ def main():
             <p>서강대학교 미디어커뮤니케이션 대학원</p>
             <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
             <p><small>Optimized for concurrent users with session management, caching, and task queuing</small></p>
+            <hr style="margin: 20px 0 10px 0; border: 0; border-top: 1px solid #333;">
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
+                <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                    <p><strong>v2.5.0</strong> (2025-01-23) - Phase 1 UI 통합: 맞춤형 프롬프트 시스템 구현</p>
+                    <p><strong>v2.4.1</strong> (2025-01-22) - 비디오 다운로드 안정성 개선</p>
+                    <p><strong>v2.4.0</strong> (2025-01-21) - Chrome agent 지원 추가</p>
+                    <p><strong>v2.3.2</strong> (2025-01-20) - Parser 및 AI Analyzer 버그 수정</p>
+                    <p><strong>v2.3.0</strong> (2025-01-19) - 동시 사용자 5명 지원 최적화 완료</p>
+                </div>
+            </details>
         </div>
     """, unsafe_allow_html=True)
 
