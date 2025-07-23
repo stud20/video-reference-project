@@ -127,8 +127,8 @@ def render_input_section():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언
-    # idle 상태이고 분석 버튼이 눌리지 않은 경우에만 표시
-    if get_analysis_state() == 'idle' and not analyze_button:
+    # idle 상태에서만 표시
+    if get_analysis_state() == 'idle':
         with col2:
             use_custom_prompt = st.checkbox(
                 "🎯 상세 분석 요청사항 추가",
@@ -136,7 +136,7 @@ def render_input_section():
                 help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
             )
             
-            if use_custom_prompt and not analyze_button:
+            if use_custom_prompt:
                 with st.expander("상세 분석 설정", expanded=True):
                     custom_prompt = render_custom_analysis_prompt()
                     if custom_prompt:
@@ -151,6 +151,7 @@ def render_input_section():
         # 분석 시작 시 상태 초기화
         if 'use_custom_prompt' in st.session_state:
             del st.session_state.use_custom_prompt
+        # 즉시 처리 상태로 변경하여 UI 숨기기
         set_analysis_state('processing')
         st.session_state.current_video_url = video_url
         st.session_state.selected_model = model_selection[0]

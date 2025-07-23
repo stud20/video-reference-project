@@ -348,6 +348,7 @@ def main():
             <details style="margin-top: 10px;">
                 <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                 <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                    <p><strong>v2.6.3</strong> (2025-01-23) - 분석하기 버튼 클릭 시 상세 분석 UI 완전 숨김 처리</p>
                     <p><strong>v2.6.2</strong> (2025-01-23) - 구버전 히스토리 정리 및 UI 개선</p>
                     <p><strong>v2.6.1</strong> (2025-01-23) - 자동 배포 워크플로우 & 버전 관리 시스템 추가</p>
                     <p><strong>v2.6.0</strong> (2025-01-23) - Phase 2 완료: 실시간 대시보드 및 동적 애니메이션 구현</p>
