@@ -155,22 +155,24 @@ def render_input_section():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언
-    with col2:
-        use_custom_prompt = st.checkbox(
-            "🎯 상세 분석 요청사항 추가",
-            key="use_custom_prompt",
-            help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
-        )
-        
-        if use_custom_prompt:
-            with st.expander("상세 분석 설정", expanded=True):
-                custom_prompt = render_custom_analysis_prompt()
-                if custom_prompt:
-                    st.session_state.custom_analysis_prompt = custom_prompt
-        else:
-            # 체크박스 해제 시 custom_prompt 초기화
-            if 'custom_analysis_prompt' in st.session_state:
-                del st.session_state.custom_analysis_prompt
+    # idle 상태에서만 표시
+    if get_analysis_state() == 'idle':
+        with col2:
+            use_custom_prompt = st.checkbox(
+                "🎯 상세 분석 요청사항 추가",
+                key="use_custom_prompt",
+                help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
+            )
+            
+            if use_custom_prompt:
+                with st.expander("상세 분석 설정", expanded=True):
+                    custom_prompt = render_custom_analysis_prompt()
+                    if custom_prompt:
+                        st.session_state.custom_analysis_prompt = custom_prompt
+            else:
+                # 체크박스 해제 시 custom_prompt 초기화
+                if 'custom_analysis_prompt' in st.session_state:
+                    del st.session_state.custom_analysis_prompt
     
     render_version_history()
     
