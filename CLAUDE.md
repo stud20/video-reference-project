@@ -123,3 +123,35 @@ sshpass -p 1212 ssh ysk@192.168.50.50 "docker restart sense-of-frame-dev"
 - Remote Docker container automatically pulls from develop branch on restart
 - This workflow ensures immediate deployment of all changes to production environment
 - **Never skip this deployment step** - it's required for every completed task
+
+## Version Management
+
+### Automatic Version Updates
+**IMPORTANT**: After every deployment, you MUST update the version history in `app.py` footer section following semantic versioning:
+
+#### Version Numbering Rules:
+- **Major version (X.0.0)**: Only when user explicitly requests major version bump
+- **Minor version (X.Y.0)**: When adding new functions, files, or significant features
+- **Patch version (X.Y.Z)**: For code modifications, bug fixes, or minor improvements
+
+#### Current Version Pattern:
+```python
+# In app.py footer section, update the version history:
+<p><strong>v2.6.1</strong> (2025-01-23) - [Brief description of changes]</p>
+```
+
+#### Examples:
+- New feature/file added: `v2.6.0` → `v2.7.0`
+- Bug fix/code modification: `v2.6.0` → `v2.6.1`
+- Major refactor (user requested): `v2.6.0` → `v3.0.0`
+
+#### Version Update Location:
+Update the version history in `app.py` at line ~351 in the footer section:
+```html
+<div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+    <p><strong>v2.6.1</strong> (2025-01-23) - [Your change description]</p>
+    <!-- Previous versions below -->
+</div>
+```
+
+**Always add new versions at the TOP of the list and include current date.**
