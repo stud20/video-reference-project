@@ -126,32 +126,37 @@ def render_input_section():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언
-    # idle 상태에서만 표시
-    if get_analysis_state() == 'idle':
-        with col2:
-            use_custom_prompt = st.checkbox(
-                "🎯 상세 분석 요청사항 추가",
-                key="use_custom_prompt",
-                help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
-            )
-            
-            if use_custom_prompt:
-                with st.expander("상세 분석 설정", expanded=True):
-                    custom_prompt = render_custom_analysis_prompt()
-                    if custom_prompt:
-                        st.session_state.custom_analysis_prompt = custom_prompt
-            else:
-                # 체크박스 해제 시 custom_prompt 초기화
-                if 'custom_analysis_prompt' in st.session_state:
-                    del st.session_state.custom_analysis_prompt
+    # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언 (세로 배치)
+    # idle 상태이고 분석이 시작되지 않았을 때만 표시
+    if get_analysis_state() == 'idle' and 'analysis_started' not in st.session_state:
+        # 중앙 정렬을 위한 컨테이너
+        st.markdown('<div style="max-width: 800px; margin: 0 auto; padding: 20px 0;">', unsafe_allow_html=True)
+        
+        use_custom_prompt = st.checkbox(
+            "🎯 상세 분석 요청사항 추가",
+            key="use_custom_prompt",
+            help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
+        )
+        
+        if use_custom_prompt:
+            with st.expander("상세 분석 설정", expanded=True):
+                custom_prompt = render_custom_analysis_prompt()
+                if custom_prompt:
+                    st.session_state.custom_analysis_prompt = custom_prompt
+        else:
+            # 체크박스 해제 시 custom_prompt 초기화
+            if 'custom_analysis_prompt' in st.session_state:
+                del st.session_state.custom_analysis_prompt
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
     
     if analyze_button and video_url:
-        # 분석 시작 시 상태 초기화
+        # 분석 시작 시 즉시 플래그 설정하여 UI 숨기기
+        st.session_state.analysis_started = True
         if 'use_custom_prompt' in st.session_state:
             del st.session_state.use_custom_prompt
-        # 즉시 처리 상태로 변경하여 UI 숨기기
+        # 처리 상태로 변경
         set_analysis_state('processing')
         st.session_state.current_video_url = video_url
         st.session_state.selected_model = model_selection[0]
