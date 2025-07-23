@@ -52,10 +52,19 @@ def render_results_section():
     render_analysis_results(video)
     
     # 사용된 프롬프트 표시 (토글 형태)
-    if 'custom_analysis_prompt' in st.session_state and st.session_state.custom_analysis_prompt:
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("📝 AI에게 보낸 요청사항", expanded=False):
-            st.info(st.session_state.custom_analysis_prompt)
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.expander("📝 AI에게 보낸 요청사항", expanded=False):
+        # 전체 프롬프트가 있으면 표시
+        if hasattr(video, 'full_prompt_used') and video.full_prompt_used:
+            st.code(video.full_prompt_used, language="text")
+        # 없으면 세션에 저장된 full_prompt_used 확인
+        elif 'full_prompt_used' in st.session_state:
+            st.code(st.session_state.full_prompt_used, language="text")
+        # 그것도 없으면 custom_prompt만이라도 표시
+        elif 'custom_analysis_prompt' in st.session_state and st.session_state.custom_analysis_prompt:
+            st.info(f"추가 분석 요청사항:\n{st.session_state.custom_analysis_prompt}")
+        else:
+            st.info("기본 분석 프롬프트가 사용되었습니다.")
     
     # 분석 결과와 액션 버튼 사이 여백
     st.markdown("<br><br>", unsafe_allow_html=True)

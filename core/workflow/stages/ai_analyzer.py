@@ -76,8 +76,17 @@ class AIAnalysisStage(PipelineStage):
         
         self.update_progress(0, f"🤖 {model_display} AI 분석 시작...", context)
         
+        # custom_prompt가 있으면 analyzer에 전달
+        if context.custom_prompt:
+            self.analyzer.custom_prompt = context.custom_prompt
+            self.logger.info(f"📝 맞춤형 분석 프롬프트 사용")
+        
         # AI 분석 실행
         analysis_result = self.analyzer.analyze_video(video)
+        
+        # 사용된 전체 프롬프트 저장
+        if hasattr(self.analyzer, 'last_full_prompt'):
+            context.full_prompt_used = self.analyzer.last_full_prompt
         
         if analysis_result:
             self.update_progress(70, f"✅ AI 분석 성공: {analysis_result.get('genre', 'Unknown')}", context)
@@ -85,6 +94,10 @@ class AIAnalysisStage(PipelineStage):
             # Video 객체에 저장
             video.analysis_result = analysis_result
             context.analysis_result = analysis_result
+            
+            # 전체 프롬프트도 Video 객체에 저장
+            if hasattr(context, 'full_prompt_used'):
+                video.full_prompt_used = context.full_prompt_used
             
             # DB에 저장
             analysis_data = {

@@ -72,6 +72,13 @@ class VideoAnalyzer:
                 image_count=len(image_payloads)
             )
             
+            # custom_prompt가 있으면 추가
+            if hasattr(self, 'custom_prompt') and self.custom_prompt:
+                prompt += f"\n\n추가 분석 요청사항:\n{self.custom_prompt}"
+            
+            # 전체 프롬프트 저장 (시스템 프롬프트 + 사용자 프롬프트)
+            self.last_full_prompt = f"시스템 프롬프트:\n{self.prompt_builder.system_prompt}\n\n사용자 프롬프트:\n{prompt}"
+            
             # 디버깅: 프롬프트 저장
             self._save_debug_info(debug_dir, "prompt.txt", prompt, {
                 "provider": self.provider.get_name(),
