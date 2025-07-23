@@ -78,8 +78,10 @@ class ResponseParser:
                         result.tags = tag_list[:20]  # 최대 20개
                         self.logger.debug(f"✅ 태그 {len(result.tags)}개 파싱됨")
                     else:
-                        setattr(result, field, value)
-                        self.logger.debug(f"✅ {field} 파싱됨: {value[:50]}...")
+                        # 라벨 제거 처리
+                        cleaned_value = self._clean_section(value)
+                        setattr(result, field, cleaned_value)
+                        self.logger.debug(f"✅ {field} 파싱됨: {cleaned_value[:50]}...")
                 else:
                     self.logger.warning(f"⚠️ {field} 매칭 실패")
             
@@ -124,6 +126,7 @@ class ResponseParser:
             for i, section in enumerate(sections):
                 if i < len(fields):
                     field = fields[i]
+                    # 라벨 제거
                     clean_section = self._clean_section(section)
                     
                     if field == 'tags':
@@ -160,8 +163,21 @@ class ResponseParser:
     
     def _clean_section(self, section: str) -> str:
         """섹션 텍스트 정리"""
-        # A1., A2. 등의 레이블 제거
-        section = re.sub(r'^A\d+[.\s]*[:：]?\s*', '', section.strip())
+        # 다양한 형태의 라벨 제거
+        # ### A1. 영상 장르 • ### A5. 표현형식 등 제거
+        section = re.sub(r'###\s*A\d+[.\s]*[^•\n]*(?:\s*•\s*###\s*A\d+[.\s]*[^•\n]*)*', '', section)
+        # A1., A1:, A1, ### A1 등 모든 형태 제거
+        section = re.sub(r'(?:^|\n)\s*(?:###\s*)?A\d+[.\s]*[:：]?\s*[^\n]*(?:\s*•[^\n]*)?', '', section)
+        # ### 마크다운 헤더 제거
+        section = re.sub(r'###\s*', '', section)
+        # 💡, ✨, 🌈, 👥 같은 이모지 제거
+        section = re.sub(r'[💡✨🌈👥]\s*[^\n]*\n?', '', section)
+        # 줄 시작의 • 제거
+        section = re.sub(r'^\s*•\s*', '', section, flags=re.MULTILINE)
+        # 앞뒤 공백 및 불필요한 문자 제거
+        section = section.strip(' •\n\r\t')
+        # 빈 줄 제거
+        section = re.sub(r'\n\s*\n', '\n', section)
         return section.strip()
     
     def _extract_genre_from_line(self, line: str) -> str:
