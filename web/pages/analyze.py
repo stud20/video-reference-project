@@ -47,34 +47,6 @@ def handle_chrome_extension_integration():
             st.rerun()
 
 
-def render_version_history():
-    """버전 히스토리 렌더링"""
-    st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 16px;
-            margin: 20px auto;
-            max-width: 600px;
-            backdrop-filter: blur(10px);
-            opacity: 0.6;
-            transition: opacity 0.3s ease;
-        ">
-            <div style="
-                font-size: 12px;
-                color: rgba(255,255,255,0.5);
-                line-height: 1.4;
-                font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
-            ">
-                <div style="margin-bottom: 8px;"><strong style="color: rgba(255,255,255,0.7);">v2.1.0</strong> - 동시 사용자 5명 지원, Redis 캐시, SQLite 커넥션 풀링 추가</div>
-                <div style="margin-bottom: 8px;"><strong style="color: rgba(255,255,255,0.7);">v2.0.0</strong> - 세션 관리 시스템, 비동기 작업 큐, 리소스 모니터링 도입</div>
-                <div style="margin-bottom: 8px;"><strong style="color: rgba(255,255,255,0.7);">v1.2.0</strong> - 멀티 AI 모델 지원 (GPT-4o, Claude Sonnet 4, Gemini), UI/UX 개선</div>
-                <div style="margin-bottom: 8px;"><strong style="color: rgba(255,255,255,0.7);">v1.1.0</strong> - Pipeline 기반 비디오 처리, Notion 연동, 데이터베이스 기능 추가</div>
-                <div><strong style="color: rgba(255,255,255,0.7);">v1.0.0</strong> - 초기 버전, YouTube/Vimeo 영상 분석, 씨네 추출, AI 분석 기본 기능</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
 
 
 def render_input_section():
@@ -174,9 +146,6 @@ def render_input_section():
                 if 'custom_analysis_prompt' in st.session_state:
                     del st.session_state.custom_analysis_prompt
     
-    # 메인 화면에서만 버전 히스토리 표시
-    if get_analysis_state() == 'idle':
-        render_version_history()
     
     if analyze_button and video_url:
         # 분석 시작 시 상태 초기화
