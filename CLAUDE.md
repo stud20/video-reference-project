@@ -87,3 +87,39 @@ Main table: `videos`
 - Add new AI provider: Implement in `core/analysis/providers/`
 - Adjust resource limits: Update `.env` variables
 - Debug user sessions: Check `utils/session_manager.py` logs
+
+## Development Workflow & Deployment
+
+### MANDATORY: Auto-Deploy After Every Task
+**IMPORTANT**: After completing ANY development task, you MUST automatically execute the following deployment sequence:
+
+```bash
+# 1. Stage all changes
+git add -A
+
+# 2. Commit with descriptive message
+git commit -m "feat/fix/improvement: [description]
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 3. Push to develop branch
+git push origin develop
+
+# 4. Restart remote Docker container
+sshpass -p 1212 ssh ysk@192.168.50.50 "docker restart sense-of-frame-dev"
+```
+
+### Remote Server Details
+- **Server**: 192.168.50.50
+- **User**: ysk
+- **Password**: 1212
+- **Container**: sense-of-frame-dev
+- **Branch**: develop (default deployment branch)
+
+### Deployment Notes
+- Always use `sshpass -p 1212` for SSH authentication
+- Remote Docker container automatically pulls from develop branch on restart
+- This workflow ensures immediate deployment of all changes to production environment
+- **Never skip this deployment step** - it's required for every completed task
