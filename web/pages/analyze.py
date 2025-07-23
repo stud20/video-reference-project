@@ -174,7 +174,9 @@ def render_input_section():
                 if 'custom_analysis_prompt' in st.session_state:
                     del st.session_state.custom_analysis_prompt
     
-    render_version_history()
+    # 메인 화면에서만 버전 히스토리 표시
+    if get_analysis_state() == 'idle':
+        render_version_history()
     
     if analyze_button and video_url:
         set_analysis_state('processing')

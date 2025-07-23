@@ -51,12 +51,41 @@ def render_results_section():
     # 분석 결과
     render_analysis_results(video)
     
+    # 사용된 프롬프트 표시 (토글 형태)
+    if 'custom_analysis_prompt' in st.session_state and st.session_state.custom_analysis_prompt:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("📝 AI에게 보낸 요청사항", expanded=False):
+            st.info(st.session_state.custom_analysis_prompt)
+    
     # 분석 결과와 액션 버튼 사이 여백
     st.markdown("<br><br>", unsafe_allow_html=True)
     
     # 액션 버튼들
     from .actions import render_action_buttons
     render_action_buttons(video)
+    
+    # 새로운 영상 분석 섹션
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("### 🎬 새로운 영상 분석")
+    
+    # 체크박스와 상세 분석 UI
+    from web.components.analyze.custom_prompt import render_custom_analysis_prompt
+    use_custom_prompt = st.checkbox(
+        "🎯 상세 분석 요청사항 추가",
+        key="use_custom_prompt_new",
+        help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
+    )
+    
+    if use_custom_prompt:
+        with st.expander("상세 분석 설정", expanded=True):
+            custom_prompt = render_custom_analysis_prompt()
+            if custom_prompt:
+                st.session_state.custom_analysis_prompt = custom_prompt
+    else:
+        # 체크박스 해제 시 custom_prompt 초기화
+        if 'custom_analysis_prompt' in st.session_state:
+            del st.session_state.custom_analysis_prompt
 
 
 def render_video_embed(url: str):
