@@ -154,13 +154,23 @@ def render_input_section():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Phase 1: 맞춤형 분석 프롬프트 컴포넌트
-    if video_url:  # URL이 입력된 경우에만 표시
-        st.markdown("---")
-        custom_prompt = render_custom_analysis_prompt()
-        if custom_prompt:
-            st.session_state.custom_analysis_prompt = custom_prompt
-        st.markdown("---")
+    # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언
+    with col2:
+        use_custom_prompt = st.checkbox(
+            "🎯 상세 분석 요청사항 추가",
+            key="use_custom_prompt",
+            help="특정 목적에 맞는 맞춤형 분석을 원하시면 체크하세요"
+        )
+        
+        if use_custom_prompt:
+            with st.expander("상세 분석 설정", expanded=True):
+                custom_prompt = render_custom_analysis_prompt()
+                if custom_prompt:
+                    st.session_state.custom_analysis_prompt = custom_prompt
+        else:
+            # 체크박스 해제 시 custom_prompt 초기화
+            if 'custom_analysis_prompt' in st.session_state:
+                del st.session_state.custom_analysis_prompt
     
     render_version_history()
     
@@ -325,6 +335,7 @@ def render_processing_section():
         try:
             precision_level = st.session_state.get('precision_level', 5)
             selected_model = st.session_state.get('selected_model', 'gpt-4o')
+            custom_prompt = st.session_state.get('custom_analysis_prompt', None)
             
             model_display_names = {
                 "gemini-2.0-flash": "Google Gemini",
@@ -332,7 +343,11 @@ def render_processing_section():
                 "claude-sonnet-4-20250514": "Claude Sonnet 4"
             }
             
-            update_progress_and_console("init", 0, f"🤖 AI 모델: {model_display_names.get(selected_model, selected_model)}")
+            # 초기 메시지에 커스텀 프롬프트 사용 여부 표시
+            init_message = f"🤖 AI 모델: {model_display_names.get(selected_model, selected_model)}"
+            if custom_prompt:
+                init_message += " (맞춤형 분석)"
+            update_progress_and_console("init", 0, init_message)
 
             # 분석 실행
             video = handle_video_analysis_enhanced(
@@ -340,7 +355,8 @@ def render_processing_section():
                 precision_level=precision_level,
                 console_callback=lambda msg: None,  # 콘솔 콜백 비활성화
                 model_name=selected_model,
-                progress_callback=update_progress_and_console  # 실시간 업데이트
+                progress_callback=update_progress_and_console,  # 실시간 업데이트
+                custom_prompt=custom_prompt  # 커스텀 프롬프트 전달
             )
 
             # 결과 처리

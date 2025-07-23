@@ -7,8 +7,6 @@ from config.analysis_prompts import AnalysisPromptTemplates
 
 def render_custom_analysis_prompt() -> Optional[str]:
     """맞춤형 분석 요청 UI 렌더링"""
-    st.subheader("🎯 맞춤형 분석 요청")
-    
     # 템플릿 선택
     templates = AnalysisPromptTemplates()
     template_categories = templates.get_categories()
@@ -17,7 +15,7 @@ def render_custom_analysis_prompt() -> Optional[str]:
     
     with col1:
         selected_category = st.selectbox(
-            "분석 카테고리 선택",
+            "분석 카테고리",
             options=list(template_categories.keys()),
             help="목적에 맞는 분석 카테고리를 선택하세요"
         )
@@ -26,15 +24,12 @@ def render_custom_analysis_prompt() -> Optional[str]:
         if selected_category:
             category_templates = template_categories[selected_category]
             selected_template = st.selectbox(
-                "템플릿 선택",
+                "템플릿",
                 options=list(category_templates.keys()),
                 help="구체적인 분석 템플릿을 선택하세요"
             )
         else:
             selected_template = None
-    
-    # 사용자 맞춤 요청사항
-    st.markdown("### 📝 상세 분석 요청사항")
     
     # 템플릿 기반 초기값 설정
     template_content = ""
@@ -50,35 +45,18 @@ def render_custom_analysis_prompt() -> Optional[str]:
     
     # 키워드 추출 및 태그
     if custom_prompt:
-        st.markdown("### 🏷️ 분석 키워드")
         keywords = extract_keywords(custom_prompt)
         
         if keywords:
+            st.markdown("**분석 키워드:**")
             # 키워드를 태그 형태로 표시
-            keyword_html = " ".join([f"<span style='background-color: #e1f5fe; padding: 2px 8px; border-radius: 12px; margin: 2px;'>{kw}</span>" for kw in keywords])
+            keyword_html = " ".join([f"<span style='background-color: #e1f5fe; padding: 2px 8px; border-radius: 12px; margin: 2px; font-size: 12px;'>{kw}</span>" for kw in keywords])
             st.markdown(keyword_html, unsafe_allow_html=True)
     
-    # 프롬프트 미리보기
+    # 프롬프트 저장된 경우 세션에 저장
     if custom_prompt:
-        with st.expander("🔍 최종 프롬프트 미리보기", expanded=False):
-            preview_prompt = generate_preview_prompt(custom_prompt)
-            st.code(preview_prompt, language="text")
-    
-    # 저장 및 적용
-    col1, col2, col3 = st.columns([1, 1, 1])
-    
-    with col1:
-        if st.button("💾 프롬프트 저장", type="secondary"):
-            save_custom_prompt(custom_prompt, selected_category, selected_template)
-            st.success("프롬프트가 저장되었습니다!")
-    
-    with col2:
-        if st.button("🔄 초기화", type="secondary"):
-            st.rerun()
-    
-    with col3:
-        if st.button("✅ 분석 시작", type="primary", disabled=not custom_prompt):
-            return custom_prompt
+        st.session_state.custom_analysis_prompt = custom_prompt
+        return custom_prompt
     
     return None
 

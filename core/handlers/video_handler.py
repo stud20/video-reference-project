@@ -8,7 +8,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def handle_video_analysis_enhanced(video_url: str, precision_level: int, console_callback: Callable, model_name: str = "gpt-4o", progress_callback: Callable = None):
+def handle_video_analysis_enhanced(video_url: str, precision_level: int, console_callback: Callable, model_name: str = "gpt-4o", progress_callback: Callable = None, custom_prompt: str = None):
     """향상된 비디오 분석 - Pipeline 기반 실시간 콘솔 출력
     
     Args:
@@ -17,6 +17,7 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
         console_callback: 콘솔 출력 콜백 함수
         model_name: 사용할 AI 모델명 (기본값: gpt-4o)
         progress_callback: 진행률 콜백 함수 (stage, progress, message, detailed_message)
+        custom_prompt: 사용자 맞춤형 분석 프롬프트 (선택사항)
     """
     
     try:
@@ -165,7 +166,8 @@ def handle_video_analysis_enhanced(video_url: str, precision_level: int, console
         video = video_service.process(
             url=video_url,
             force_reanalyze=False,
-            progress_callback=progress_callback_wrapper
+            progress_callback=progress_callback_wrapper,
+            custom_prompt=custom_prompt
         )
         
         # 분석 완료 후 결과 요약

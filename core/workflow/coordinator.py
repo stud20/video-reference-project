@@ -43,7 +43,8 @@ class VideoProcessor:
     def process(self, 
                 url: str, 
                 force_reanalyze: bool = False,
-                progress_callback: Optional[Callable] = None) -> Any:
+                progress_callback: Optional[Callable] = None,
+                custom_prompt: Optional[str] = None) -> Any:
         """
         영상 처리 실행
         
@@ -51,6 +52,7 @@ class VideoProcessor:
             url: 분석할 영상 URL
             force_reanalyze: 기존 분석 결과가 있어도 재분석 여부
             progress_callback: 진행 상황 콜백 (stage, progress, message)
+            custom_prompt: 사용자 맞춤형 분석 프롬프트 (선택사항)
             
         Returns:
             처리 완료된 Video 객체
@@ -60,7 +62,8 @@ class VideoProcessor:
             context = self.pipeline.execute(
                 url=url,
                 force_reanalyze=force_reanalyze,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                custom_prompt=custom_prompt
             )
             
             # Video 객체 반환
