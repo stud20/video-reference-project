@@ -3,6 +3,8 @@ streamlit>=1.28.0
 stqdm>=0.0.5
 streamlit-extras>=0.3.0
 streamlit-javascript>=0.1.5
+plotly>=5.17.0
+psutil>=5.9.0
 
 # ===== 영상 처리 및 다운로드 =====
 yt-dlp>=2023.10.13          # YouTube/Vimeo 다운로드

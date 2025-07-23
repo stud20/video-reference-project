@@ -29,6 +29,7 @@ from web.styles.theme import get_enhanced_styles
 from web.pages.analyze import render_analyze_tab
 from web.pages.database import render_database_tab
 from web.pages.settings import render_settings_tab
+from web.pages.dashboard import render_dashboard_tab, get_dashboard_styles
 
 logger = get_logger(__name__)
 
@@ -44,6 +45,7 @@ def setup_page():
     
     # 향상된 CSS 스타일 적용
     st.markdown(get_enhanced_styles(), unsafe_allow_html=True)
+    st.markdown(get_dashboard_styles(), unsafe_allow_html=True)
     
     # 세션 상태 초기화 먼저 수행
     from web.state import init_session_state
@@ -313,8 +315,9 @@ def main():
     """, unsafe_allow_html=True)
     
     # 탭 생성
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "ANALYZE", 
+        "DASHBOARD",
         "DATABASE", 
         "SETTINGS",
         "SYSTEM"
@@ -324,12 +327,15 @@ def main():
         render_optimized_analyze_tab()
     
     with tab2:
-        render_database_tab()
+        render_dashboard_tab()
     
     with tab3:
-        render_settings_tab()
+        render_database_tab()
     
     with tab4:
+        render_settings_tab()
+    
+    with tab5:
         render_health_check()
     
     # Footer
@@ -342,6 +348,7 @@ def main():
             <details style="margin-top: 10px;">
                 <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                 <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                    <p><strong>v2.6.0</strong> (2025-01-23) - Phase 2 완료: 실시간 대시보드 및 동적 애니메이션 구현</p>
                     <p><strong>v2.5.0</strong> (2025-01-23) - Phase 1 UI 통합: 맞춤형 프롬프트 시스템 구현</p>
                     <p><strong>v2.4.1</strong> (2025-01-22) - 비디오 다운로드 안정성 개선</p>
                     <p><strong>v2.4.0</strong> (2025-01-21) - Chrome agent 지원 추가</p>

@@ -16,6 +16,51 @@ def get_enhanced_styles() -> str:
        폰트 임포트
        ============= */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap');
+    
+    /* ===================
+       동적 애니메이션
+       =================== */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+    
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
 
     /* Streamlit 헤더 숨기기 */
     header[data-testid="stHeader"] {
@@ -815,5 +860,145 @@ def get_enhanced_styles() -> str:
         background: rgba(255, 255, 255, 0.08) !important;
         border-color: rgba(255, 255, 255, 0.2) !important;
     }
+    
+    /* ===================
+       동적 효과 적용
+       =================== */
+    
+    /* 메인 헤더 애니메이션 */
+    .main-header {
+        animation: fadeInUp 1s ease-out;
+    }
+    
+    .main-title {
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #ffeaa7);
+        background-size: 400% 400%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: gradientShift 4s ease infinite;
+    }
+    
+    /* 사용법 가이드 애니메이션 */
+    .usage-guide {
+        animation: slideInRight 0.8s ease-out;
+    }
+    
+    .usage-step {
+        animation: fadeInUp 0.6s ease-out;
+        animation-fill-mode: both;
+    }
+    
+    .usage-step:nth-child(1) { animation-delay: 0.2s; }
+    .usage-step:nth-child(2) { animation-delay: 0.4s; }
+    .usage-step:nth-child(3) { animation-delay: 0.6s; }
+    
+    /* 입력 섹션 애니메이션 */
+    .input-section-wrapper {
+        animation: fadeInUp 0.7s ease-out 0.3s both;
+    }
+    
+    /* 프로그레스 바 동적 효과 */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, #4ecdc4, #44a08d) !important;
+        border-radius: 10px !important;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    /* 실시간 로그 애니메이션 */
+    .console-window {
+        animation: fadeInUp 0.5s ease-out;
+        border: 1px solid #333;
+        box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        transition: box-shadow 0.3s ease;
+    }
+    
+    .console-window:hover {
+        box-shadow: 0 0 30px rgba(0, 255, 65, 0.5);
+    }
+    
+    /* 결과 섹션 애니메이션 */
+    .result-section {
+        animation: fadeInUp 0.8s ease-out;
+    }
+    
+    /* 체크박스 hover 효과 */
+    .stCheckbox:hover {
+        transform: scale(1.02);
+        transition: transform 0.2s ease;
+    }
+    
+    /* expander 동적 효과 */
+    .streamlit-expanderHeader {
+        transition: all 0.3s ease !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        transform: translateX(5px) !important;
+    }
+    
+    /* 토글 버튼 애니메이션 */
+    details summary {
+        transition: all 0.3s ease;
+    }
+    
+    details summary:hover {
+        color: #4ecdc4 !important;
+        transform: translateX(5px);
+    }
+    
+    /* 버전 히스토리 float 효과 */
+    .footer details {
+        animation: float 6s ease-in-out infinite;
+    }
+    
+    /* 로딩 스피너 효과 */
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+    
+    /* 카드 hover 효과 */
+    .db-card-container {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .db-card-container:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* 실시간 메트릭 카운터 애니메이션 */
+    @keyframes countUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .metric-value {
+        animation: countUp 0.5s ease-out;
+        font-weight: bold;
+        color: #4ecdc4;
+    }
+    
+    /* 탭 전환 애니메이션 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        transition: all 0.3s ease;
+        border-radius: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        transform: translateY(-2px);
+    }
+    
     </style>
     """
