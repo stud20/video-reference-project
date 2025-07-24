@@ -127,8 +127,8 @@ def render_input_section():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Phase 1: 맞춤형 분석 프롬프트 - 체크박스와 아코디언 (세로 배치)
-    # idle 상태이고 분석이 시작되지 않았을 때만 표시
-    if get_analysis_state() == 'idle' and 'analysis_started' not in st.session_state:
+    # idle 상태이고 UI가 숨겨지지 않았을 때만 표시
+    if get_analysis_state() == 'idle' and not st.session_state.get('hide_custom_ui', False):
         # 중앙 정렬을 위한 컨테이너
         st.markdown('<div style="max-width: 800px; margin: 0 auto; padding: 20px 0;">', unsafe_allow_html=True)
         
@@ -152,8 +152,8 @@ def render_input_section():
     
     
     if analyze_button and video_url:
-        # 분석 시작 시 즉시 플래그 설정하여 UI 숨기기
-        st.session_state.analysis_started = True
+        # 분석 시작 시 즉시 UI 숨기기 플래그 설정
+        st.session_state.hide_custom_ui = True
         if 'use_custom_prompt' in st.session_state:
             del st.session_state.use_custom_prompt
         # 처리 상태로 변경
@@ -354,6 +354,8 @@ def render_processing_section():
                     del st.session_state.processing_data
                 if 'analysis_started' in st.session_state:
                     del st.session_state.analysis_started
+                if 'hide_custom_ui' in st.session_state:
+                    del st.session_state.hide_custom_ui
                 
                 set_analysis_state('completed')
                 logger.info(f"Analysis completed successfully for video: {video.session_id}")
@@ -374,6 +376,8 @@ def render_processing_section():
                 del st.session_state.processing_data
             if 'analysis_started' in st.session_state:
                 del st.session_state.analysis_started
+            if 'hide_custom_ui' in st.session_state:
+                del st.session_state.hide_custom_ui
             
             set_analysis_state('idle')
             time.sleep(3)
