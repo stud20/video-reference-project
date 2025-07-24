@@ -13,12 +13,17 @@ class DownloadOptions:
     
     @staticmethod
     def get_aggressive_bypass_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """최강 우회 옵션 - 가장 단순하고 안정적인 접근"""
+        """최강 우회 옵션 - 고품질 유지하면서 안정적인 접근"""
         return {
             'outtmpl': output_path,
             
-            # 기본 포맷만 사용
-            'format': 'best[ext=mp4]/best',
+            # 고품질 우선 포맷 선택
+            'format': (
+                'best[height>=720][ext=mp4]/'  # 최소 720p MP4
+                'bv*[vcodec^=avc1]+ba/'        # H.264 조합
+                'best[ext=mp4]/'               # MP4 폴백
+                'best'                         # 최종 폴백
+            ),
             
             # 기본 User-Agent
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -87,10 +92,15 @@ class DownloadOptions:
     
     @staticmethod
     def get_no_cookies_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """쿠키 없이 다운로드 시도 - 가장 단순한 접근"""
+        """쿠키 없이 다운로드 시도 - 고품질 유지"""
         return {
             'outtmpl': output_path,
-            'format': 'best[ext=mp4]/best',
+            'format': (
+                'best[height>=720][ext=mp4]/'  # 최소 720p MP4
+                'bv*[vcodec^=avc1]+ba/'        # H.264 조합
+                'best[ext=mp4]/'               # MP4 폴백
+                'best'                         # 최종 폴백
+            ),
             'sleep_interval': 2,
             'max_sleep_interval': 8,
             'retries': 3,
@@ -101,12 +111,18 @@ class DownloadOptions:
         }
     @staticmethod
     def get_best_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """최고 품질 MP4 다운로드 옵션 - 간단하고 안정적인 방식"""
+        """최고 품질 MP4 다운로드 옵션 - 고화질 우선"""
         return {
             'outtmpl': output_path,
             
-            # 포맷 선택 - 단순하게
-            'format': 'best[ext=mp4]/best',
+            # 포맷 선택 - 고화질 우선 (1080p 이상)
+            'format': (
+                'bv*[height>=1080][vcodec^=avc1]+ba[acodec^=mp4a]/'  # H.264 1080p+ 우선
+                'best[height>=1080][ext=mp4]/'                      # 1080p+ MP4
+                'bv*[vcodec^=avc1]+ba[acodec^=mp4a]/'              # H.264 AAC 조합
+                'best[ext=mp4]/'                                    # MP4 폴백
+                'best'                                              # 최종 폴백
+            ),
             
             # 쿠키 설정 - Chrome 우선 시도
             'cookiesfrombrowser': ('chrome',),
