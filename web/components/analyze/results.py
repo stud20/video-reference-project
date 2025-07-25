@@ -325,7 +325,11 @@ def render_analysis_results(video):
             
             # duration - None 체크
             if metadata.duration is not None and metadata.duration > 0:
-                info_html += f'<div class="info-item">⏱️ 길이: <strong>{int(metadata.duration//60)}분 {int(metadata.duration%60)}초</strong></div>'
+                duration_text = f'{int(metadata.duration//60)}분 {int(metadata.duration%60)}초'
+                # Shorts/Reels 표시 추가
+                if metadata.is_short_form:
+                    duration_text += ' <span style="background: #ff0000; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 8px;">Shorts</span>'
+                info_html += f'<div class="info-item">⏱️ 길이: <strong>{duration_text}</strong></div>'
             
             # upload_date - None 체크
             if metadata.upload_date:

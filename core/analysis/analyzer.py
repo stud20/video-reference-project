@@ -72,6 +72,15 @@ class VideoAnalyzer:
                 image_count=len(image_payloads)
             )
             
+            # Shorts/Reels 감지 시 자동 프롬프트 추가
+            if video.metadata and video.metadata.is_short_form:
+                shorts_prompt = "\n\n이 영상은 짧은 형식(Shorts/Reels)입니다. 다음 추가 요소도 분석해주세요:\n"
+                shorts_prompt += "- 첫 3초 내 시선 끌기 효과\n"
+                shorts_prompt += "- 빠른 편집과 전환 효과\n"
+                shorts_prompt += "- 세로형 화면 활용도\n"
+                shorts_prompt += "- 반복 시청 유도 요소\n"
+                prompt += shorts_prompt
+            
             # custom_prompt가 있으면 추가
             if hasattr(self, 'custom_prompt') and self.custom_prompt:
                 prompt += f"\n\n추가 분석 요청사항:\n{self.custom_prompt}"

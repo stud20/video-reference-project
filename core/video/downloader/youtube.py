@@ -63,6 +63,8 @@ class YouTubeDownloader(VideoFetcher):
         try:
             # 비디오 ID 추출을 위한 패턴들
             patterns = [
+                # YouTube Shorts URL
+                r'(?:https?://)?(?:www\.)?(?:m\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})',
                 # 표준 YouTube URL
                 r'(?:https?://)?(?:www\.)?(?:m\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})',
                 # 단축 URL
@@ -189,6 +191,14 @@ class YouTubeDownloader(VideoFetcher):
                 info = ydl.extract_info(url, download=False)
                 video_id = info.get('id', '')
                 video_title = info.get('title', 'untitled')
+                duration = info.get('duration', 0)
+                width = info.get('width', 0)
+                height = info.get('height', 0)
+            
+            # Shorts 감지 (60초 이하 또는 세로형 동영상)
+            is_shorts = duration <= 60 or (height > width and height/width > 1.5)
+            if is_shorts:
+                self.logger.info(f"📱 YouTube Shorts 감지됨! (길이: {duration}초, 비율: {width}x{height})")
             
             if not video_id:
                 raise ValueError("비디오 ID를 추출할 수 없습니다.")
@@ -247,7 +257,10 @@ class YouTubeDownloader(VideoFetcher):
                 thumbnail=info.get('thumbnail', ''),  # 원본 URL
                 webpage_url=info.get('webpage_url', url),
                 subtitle_files=subtitle_files,
-                platform=self._detect_platform(url)
+                platform=self._detect_platform(url),
+                width=info.get('width', 0),
+                height=info.get('height', 0),
+                is_short_form=is_shorts  # 위에서 계산한 값 사용
             )
             
             # Video 객체 업데이트

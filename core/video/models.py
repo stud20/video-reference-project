@@ -27,6 +27,9 @@ class VideoMetadata:
     ext: str = "mp4"  # 파일 확장자
     thumbnail: str = ""  # 썸네일 URL
     webpage_url: str = ""  # 웹페이지 URL
+    width: int = 0  # 비디오 너비
+    height: int = 0  # 비디오 높이
+    is_short_form: bool = False  # Shorts/Reels 여부
     
     def to_dict(self) -> dict:
         """딕셔너리로 변환"""

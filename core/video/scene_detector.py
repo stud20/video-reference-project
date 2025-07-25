@@ -231,6 +231,16 @@ class SceneExtractor:
             # 2. 비디오 정보 가져오기
             video_info = self._get_video_info(video_path)
             duration = float(video_info.get('duration', 0))
+            width = int(video_info.get('width', 0))
+            height = int(video_info.get('height', 0))
+            
+            # Shorts/Reels 감지
+            is_short_form = duration <= 60 or (height > width and height/width > 1.5)
+            if is_short_form:
+                self.logger.info(f"📱 짧은 형식 동영상 감지! (길이: {duration:.1f}초, 비율: {width}x{height})")
+                # 짧은 동영상용 설정 조정
+                self.min_scene_duration = 0.2  # 더 짧은 씬도 포함
+                self.scene_threshold = 0.15  # 더 민감한 씬 감지
             
             self.logger.info(f"📹 영상 길이: {duration:.1f}초")
             
