@@ -25,10 +25,12 @@ class SceneExtractionStage(PipelineStage):
         video = context.video_object
         
         # 씬 추출 (내부 progress callback 없이)
+        is_short_form = video.metadata.is_short_form if video.metadata else False
         scenes_result = self.extractor.extract_scenes(
             video.local_path,
             video.session_id,
-            progress_callback=None
+            progress_callback=None,
+            is_short_form=is_short_form
         )
         
         # Scene 객체로 변환

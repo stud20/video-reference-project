@@ -348,6 +348,7 @@ def main():
             <details style="margin-top: 10px;">
                 <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                 <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                    <p><strong>v2.8.1</strong> (2025-01-23) - Shorts 감지 로직 개선 (URL 패턴 기반)</p>
                     <p><strong>v2.8.0</strong> (2025-01-23) - YouTube Shorts/Reels 지원 추가</p>
                     <p><strong>v2.7.0</strong> (2025-01-23) - 고화질 비디오 다운로드 설정 개선</p>
                     <p><strong>v2.6.5</strong> (2025-01-23) - 분석 실행 로직 수정 및 UI 플래그 분리</p>

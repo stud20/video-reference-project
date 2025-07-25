@@ -195,8 +195,8 @@ class YouTubeDownloader(VideoFetcher):
                 width = info.get('width', 0)
                 height = info.get('height', 0)
             
-            # Shorts 감지 (60초 이하 또는 세로형 동영상)
-            is_shorts = duration <= 60 or (height > width and height/width > 1.5)
+            # Shorts 감지 (URL 패턴으로만)
+            is_shorts = '/shorts/' in url
             if is_shorts:
                 self.logger.info(f"📱 YouTube Shorts 감지됨! (길이: {duration}초, 비율: {width}x{height})")
             

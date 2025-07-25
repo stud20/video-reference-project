@@ -207,7 +207,7 @@ class SceneExtractor:
         self.logger.info(f"🎯 목표 씬 개수: {self.target_scene_count}개")
     
         
-    def extract_scenes(self, video_path: str, session_id: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+    def extract_scenes(self, video_path: str, session_id: str, progress_callback: Optional[Callable] = None, is_short_form: bool = False) -> Dict[str, Any]:
         """비디오에서 모든 씬 추출 후 정밀도에 따라 그룹화"""
         # 시작하기 전에 최신 설정 로드
         settings_changed = self.update_settings()
@@ -234,11 +234,12 @@ class SceneExtractor:
             width = int(video_info.get('width', 0))
             height = int(video_info.get('height', 0))
             
-            # Shorts/Reels 감지
-            is_short_form = duration <= 60 or (height > width and height/width > 1.5)
+            # Shorts/Reels 최적화 설정
             if is_short_form:
-                self.logger.info(f"📱 짧은 형식 동영상 감지! (길이: {duration:.1f}초, 비율: {width}x{height})")
+                self.logger.info(f"📱 Shorts/Reels 최적화 모드! (길이: {duration:.1f}초, 비율: {width}x{height})")
                 # 짧은 동영상용 설정 조정
+                original_min_duration = self.min_scene_duration
+                original_threshold = self.scene_threshold
                 self.min_scene_duration = 0.2  # 더 짧은 씬도 포함
                 self.scene_threshold = 0.15  # 더 민감한 씬 감지
             
