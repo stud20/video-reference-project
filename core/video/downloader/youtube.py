@@ -8,6 +8,7 @@ from core.video.models import Video, VideoMetadata
 from utils.logger import get_logger
 from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
+from config.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,7 @@ class YouTubeDownloader(VideoFetcher):
     def __init__(self):
         super().__init__()
         self.logger = logger
-        self.temp_dir = "data/temp"
+        self.temp_dir = Settings.paths.temp_dir
         os.makedirs(self.temp_dir, exist_ok=True)
         self.video_processor = VideoProcessor()
         self.download_options = DownloadOptions()
@@ -311,7 +312,7 @@ class YouTubeDownloader(VideoFetcher):
         
         # Video 객체 생성 - 올바른 session_dir 사용
         video = Video(session_id=video_id, url=url, local_path="")
-        video.session_dir = os.path.join(self.temp_dir, video_id)
+        video.session_dir = os.path.join(Settings.paths.temp_dir, video_id)
         
         # 다운로드 수행
         filepath, metadata = self.download(video, progress_callback)

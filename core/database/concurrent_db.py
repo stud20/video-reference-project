@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass, asdict
 
 from utils.logger import get_logger
+from config.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -107,7 +108,9 @@ class ConnectionPool:
 class ConcurrentVideoDatabase:
     """동시성을 지원하는 비디오 데이터베이스"""
     
-    def __init__(self, db_path: str = "data/database/videos.db", max_connections: int = 10):
+    def __init__(self, db_path: str = None, max_connections: int = 10):
+        if db_path is None:
+            db_path = os.path.join(Settings.paths.data_dir, "database", "videos.db")
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         

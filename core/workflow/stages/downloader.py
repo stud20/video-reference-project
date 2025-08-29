@@ -4,6 +4,7 @@
 import os
 from core.video.downloader.youtube import YouTubeDownloader
 from core.video.models import Video, VideoMetadata
+from config.settings import Settings
 
 from ..pipeline import PipelineStage, PipelineContext
 
@@ -58,7 +59,7 @@ class DownloadStage(PipelineStage):
         )
         
         # session_dir 수정 - video_id를 사용하여 올바른 경로 설정
-        video.session_dir = os.path.join("data/temp", context.video_id)
+        video.session_dir = os.path.join(Settings.paths.temp_dir, context.video_id)
         self.logger.info(f"📁 세션 디렉토리 설정: {video.session_dir}")
         video.scenes = []  # 씬은 나중에 추출
         

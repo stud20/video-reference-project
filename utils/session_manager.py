@@ -17,6 +17,7 @@ import psutil
 import time
 
 from utils.logger import get_logger
+from config.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -43,7 +44,7 @@ class SessionManager:
         self.sessions: Dict[str, UserSession] = {}
         self.task_queue = []
         self.lock = threading.RLock()
-        self.base_workspace = Path("data/workspaces")
+        self.base_workspace = Path(Settings.paths.workspaces_dir)
         self.base_workspace.mkdir(parents=True, exist_ok=True)
         
         # 시스템 리소스 모니터링
