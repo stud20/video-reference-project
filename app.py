@@ -30,6 +30,7 @@ from web.pages.analyze import render_analyze_tab
 from web.pages.database import render_database_tab
 from web.pages.settings import render_settings_tab
 from web.pages.dashboard import render_dashboard_tab, get_dashboard_styles
+from utils.git_utils import is_beta_branch
 
 logger = get_logger(__name__)
 
@@ -307,12 +308,20 @@ def main():
     render_system_status()
     
     # 메인 헤더
-    st.markdown("""
-        <div class="main-header">
-            <h1 class="main-title">Sense of Frame</h1>
-            <p class="powered-by">Powered by greatminds.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    if is_beta_branch():
+        st.markdown("""
+            <div class="main-header">
+                <h1 class="main-title">Sense of Frame <span style="font-size: 0.5em; color: #ff6b6b; vertical-align: super;">[BETA]</span></h1>
+                <p class="powered-by">Powered by greatminds.</p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div class="main-header">
+                <h1 class="main-title">Sense of Frame</h1>
+                <p class="powered-by">Powered by greatminds.</p>
+            </div>
+        """, unsafe_allow_html=True)
     
     # 탭 생성
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -339,8 +348,18 @@ def main():
         render_health_check()
     
     # Footer
-    st.markdown("""
+    beta_notice = ""
+    if is_beta_branch():
+        beta_notice = """
+            <div style="background-color: #ff6b6b; color: white; padding: 10px; text-align: center; margin-bottom: 20px; border-radius: 5px;">
+                <strong>⚠️ BETA VERSION ⚠️</strong><br>
+                <small>This is a beta version for testing. Features may be unstable.</small>
+            </div>
+        """
+    
+    st.markdown(f"""
         <div class="footer">
+            {beta_notice}
             <p>서강대학교 미디어커뮤니케이션 대학원</p>
             <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
             <p><small>Optimized for concurrent users with session management, caching, and task queuing</small></p>
