@@ -348,44 +348,72 @@ def main():
         render_health_check()
     
     # Footer
-    beta_notice = ""
     if is_beta_branch():
-        beta_notice = """
-            <div style="background-color: #ff6b6b; color: white; padding: 10px; text-align: center; margin-bottom: 20px; border-radius: 5px;">
-                <strong>⚠️ BETA VERSION ⚠️</strong><br>
-                <small>This is a beta version for testing. Features may be unstable.</small>
-            </div>
-        """
-    
-    st.markdown(f"""
-        <div class="footer">
-            {beta_notice}
-            <p>서강대학교 미디어커뮤니케이션 대학원</p>
-            <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
-            <p><small>Optimized for concurrent users with session management, caching, and task queuing</small></p>
-            <hr style="margin: 20px 0 10px 0; border: 0; border-top: 1px solid #333;">
-            <details style="margin-top: 10px;">
-                <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
-                <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
-                    <p><strong>v2.9.0</strong> (2025-01-29) - 브랜치별 베타 버전 자동 표시 기능 추가</p>
-                    <p><strong>v2.8.1</strong> (2025-01-23) - Shorts 감지 로직 개선 (URL 패턴 기반)</p>
-                    <p><strong>v2.8.0</strong> (2025-01-23) - YouTube Shorts/Reels 지원 추가</p>
-                    <p><strong>v2.7.0</strong> (2025-01-23) - 고화질 비디오 다운로드 설정 개선</p>
-                    <p><strong>v2.6.5</strong> (2025-01-23) - 분석 실행 로직 수정 및 UI 플래그 분리</p>
-                    <p><strong>v2.6.4</strong> (2025-01-23) - 상세 분석 UI 레이아웃 개선 및 세로 배치로 변경</p>
-                    <p><strong>v2.6.3</strong> (2025-01-23) - 분석하기 버튼 클릭 시 상세 분석 UI 완전 숨김 처리</p>
-                    <p><strong>v2.6.2</strong> (2025-01-23) - 구버전 히스토리 정리 및 UI 개선</p>
-                    <p><strong>v2.6.1</strong> (2025-01-23) - 자동 배포 워크플로우 & 버전 관리 시스템 추가</p>
-                    <p><strong>v2.6.0</strong> (2025-01-23) - Phase 2 완료: 실시간 대시보드 및 동적 애니메이션 구현</p>
-                    <p><strong>v2.5.0</strong> (2025-01-23) - Phase 1 UI 통합: 맞춤형 프롬프트 시스템 구현</p>
-                    <p><strong>v2.4.1</strong> (2025-01-22) - 비디오 다운로드 안정성 개선</p>
-                    <p><strong>v2.4.0</strong> (2025-01-21) - Chrome agent 지원 추가</p>
-                    <p><strong>v2.3.2</strong> (2025-01-20) - Parser 및 AI Analyzer 버그 수정</p>
-                    <p><strong>v2.3.0</strong> (2025-01-19) - 동시 사용자 5명 지원 최적화 완료</p>
+        # 베타 버전 표시가 포함된 footer
+        st.markdown("""
+            <div class="footer">
+                <div style="background-color: #ff6b6b; color: white; padding: 10px; text-align: center; margin-bottom: 20px; border-radius: 5px;">
+                    <strong>⚠️ BETA VERSION ⚠️</strong><br>
+                    <small>This is a beta version for testing. Features may be unstable.</small>
                 </div>
-            </details>
-        </div>
-    """, unsafe_allow_html=True)
+                <p>서강대학교 미디어커뮤니케이션 대학원</p>
+                <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
+                <p><small>Optimized for concurrent users with session management, caching, and task queuing</small></p>
+                <hr style="margin: 20px 0 10px 0; border: 0; border-top: 1px solid #333;">
+                <details style="margin-top: 10px;">
+                    <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
+                    <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.9.1</strong> (2025-01-29) - Footer HTML 렌더링 문제 수정</p>
+                        <p><strong>v2.9.0</strong> (2025-01-29) - 브랜치별 베타 버전 자동 표시 기능 추가</p>
+                        <p><strong>v2.8.1</strong> (2025-01-23) - Shorts 감지 로직 개선 (URL 패턴 기반)</p>
+                        <p><strong>v2.8.0</strong> (2025-01-23) - YouTube Shorts/Reels 지원 추가</p>
+                        <p><strong>v2.7.0</strong> (2025-01-23) - 고화질 비디오 다운로드 설정 개선</p>
+                        <p><strong>v2.6.5</strong> (2025-01-23) - 분석 실행 로직 수정 및 UI 플래그 분리</p>
+                        <p><strong>v2.6.4</strong> (2025-01-23) - 상세 분석 UI 레이아웃 개선 및 세로 배치로 변경</p>
+                        <p><strong>v2.6.3</strong> (2025-01-23) - 분석하기 버튼 클릭 시 상세 분석 UI 완전 숨김 처리</p>
+                        <p><strong>v2.6.2</strong> (2025-01-23) - 구버전 히스토리 정리 및 UI 개선</p>
+                        <p><strong>v2.6.1</strong> (2025-01-23) - 자동 배포 워크플로우 & 버전 관리 시스템 추가</p>
+                        <p><strong>v2.6.0</strong> (2025-01-23) - Phase 2 완료: 실시간 대시보드 및 동적 애니메이션 구현</p>
+                        <p><strong>v2.5.0</strong> (2025-01-23) - Phase 1 UI 통합: 맞춤형 프롬프트 시스템 구현</p>
+                        <p><strong>v2.4.1</strong> (2025-01-22) - 비디오 다운로드 안정성 개선</p>
+                        <p><strong>v2.4.0</strong> (2025-01-21) - Chrome agent 지원 추가</p>
+                        <p><strong>v2.3.2</strong> (2025-01-20) - Parser 및 AI Analyzer 버그 수정</p>
+                        <p><strong>v2.3.0</strong> (2025-01-19) - 동시 사용자 5명 지원 최적화 완료</p>
+                    </div>
+                </details>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        # 일반 버전 footer
+        st.markdown("""
+            <div class="footer">
+                <p>서강대학교 미디어커뮤니케이션 대학원</p>
+                <p>인공지능버추얼콘텐츠 전공 C65028 김윤섭</p>
+                <p><small>Optimized for concurrent users with session management, caching, and task queuing</small></p>
+                <hr style="margin: 20px 0 10px 0; border: 0; border-top: 1px solid #333;">
+                <details style="margin-top: 10px;">
+                    <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
+                    <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.9.1</strong> (2025-01-29) - Footer HTML 렌더링 문제 수정</p>
+                        <p><strong>v2.9.0</strong> (2025-01-29) - 브랜치별 베타 버전 자동 표시 기능 추가</p>
+                        <p><strong>v2.8.1</strong> (2025-01-23) - Shorts 감지 로직 개선 (URL 패턴 기반)</p>
+                        <p><strong>v2.8.0</strong> (2025-01-23) - YouTube Shorts/Reels 지원 추가</p>
+                        <p><strong>v2.7.0</strong> (2025-01-23) - 고화질 비디오 다운로드 설정 개선</p>
+                        <p><strong>v2.6.5</strong> (2025-01-23) - 분석 실행 로직 수정 및 UI 플래그 분리</p>
+                        <p><strong>v2.6.4</strong> (2025-01-23) - 상세 분석 UI 레이아웃 개선 및 세로 배치로 변경</p>
+                        <p><strong>v2.6.3</strong> (2025-01-23) - 분석하기 버튼 클릭 시 상세 분석 UI 완전 숨김 처리</p>
+                        <p><strong>v2.6.2</strong> (2025-01-23) - 구버전 히스토리 정리 및 UI 개선</p>
+                        <p><strong>v2.6.1</strong> (2025-01-23) - 자동 배포 워크플로우 & 버전 관리 시스템 추가</p>
+                        <p><strong>v2.6.0</strong> (2025-01-23) - Phase 2 완료: 실시간 대시보드 및 동적 애니메이션 구현</p>
+                        <p><strong>v2.5.0</strong> (2025-01-23) - Phase 1 UI 통합: 맞춤형 프롬프트 시스템 구현</p>
+                        <p><strong>v2.4.1</strong> (2025-01-22) - 비디오 다운로드 안정성 개선</p>
+                        <p><strong>v2.4.0</strong> (2025-01-21) - Chrome agent 지원 추가</p>
+                        <p><strong>v2.3.2</strong> (2025-01-20) - Parser 및 AI Analyzer 버그 수정</p>
+                        <p><strong>v2.3.0</strong> (2025-01-19) - 동시 사용자 5명 지원 최적화 완료</p>
+                    </div>
+                </details>
+            </div>
+        """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
