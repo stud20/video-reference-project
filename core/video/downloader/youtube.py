@@ -110,40 +110,13 @@ class YouTubeDownloader(VideoFetcher):
 
 
     def _download_with_fallback(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
-        """순차적 다운로드 시도: Chrome -> 쿠키파일 -> Safari -> 쿠키없이"""
+        """순차적 다운로드 시도: 쿠키 없는 방법들만 사용"""
         
-        # 기본 옵션 함수 선택
-        if quality_option == "fast":
-            base_options_func = self.download_options.get_fast_mp4_options
-        elif quality_option == "balanced":
-            base_options_func = self.download_options.get_balanced_mp4_options
-        else:  # best
-            base_options_func = self.download_options.get_best_mp4_options
-        
-        # 쿠키 파일 존재 확인 - 프로젝트 루트 경로에서 확인
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        cookies_file_path = os.path.join(project_root, 'cookies.txt')
-        cookies_file_exists = os.path.exists(cookies_file_path)
-        
-        if cookies_file_exists:
-            self.logger.info(f"🍪 cookies.txt 파일 발견! 경로: {cookies_file_path}")
-        else:
-            self.logger.warning(f"⚠️ cookies.txt 파일을 찾을 수 없음: {cookies_file_path}")
-        
-        # 다운로드 방법들 정의 (쿠키 파일 조건부 추가)
+        # 다운로드 방법들 정의 (쿠키 없는 방법들만)
         download_methods = [
-            ("Chrome 쿠키", lambda: base_options_func(output_template))
-        ]
-        
-        # 쿠키 파일이 있으면 두 번째로 시도
-        if cookies_file_exists:
-            download_methods.append(("쿠키 파일 (cookies.txt)", lambda: self.download_options.get_cookies_file_mp4_options(output_template)))
-        
-        download_methods.extend([
-            ("Safari 쿠키", lambda: self.download_options.get_safari_mp4_options(output_template)),
             ("쿠키 없이", lambda: self.download_options.get_no_cookies_mp4_options(output_template)),
             ("최강 우회 모드", lambda: self.download_options.get_aggressive_bypass_options(output_template))
-        ])
+        ]
         
         downloaded_file = None
         info = None
@@ -517,9 +490,9 @@ class YouTubeDownloader(VideoFetcher):
         # URL에서 video_id 추출
         normalized_url = self._normalize_url(url)
         
-        # Vimeo의 경우 Docker/Linux 환경 대응
+        # Vimeo의 경우 쿠키 없는 환경 대응
         if 'vimeo.com' in normalized_url:
-            self.logger.info("🔐 Vimeo Legacy 메타데이터 추출 - Docker 최적화")
+            self.logger.info("🔐 Vimeo Legacy 메타데이터 추출 - 쿠키 없이")
             
             video_id = extract_vimeo_id(normalized_url)
             

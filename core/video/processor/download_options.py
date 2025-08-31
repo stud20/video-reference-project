@@ -51,51 +51,7 @@ class DownloadOptions:
             }
         }
     
-    @staticmethod
-    def get_cookies_file_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """쿠키 파일 사용 옵션: cookies.txt 파일 사용"""
-        options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
-        
-        # 브라우저 쿠키 옵션 제거
-        if 'cookiesfrombrowser' in options:
-            del options['cookiesfrombrowser']
-        
-        # 쿠키 파일 설정 - 프로젝트 루트부터 확인
-        import os
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        cookie_paths = [
-            os.path.join(project_root, 'cookies.txt'),  # 프로젝트 루트
-            '/app/video-reference-project/cookies.txt',  # Docker 환경 정확한 경로
-            'cookies.txt',  # 현재 디렉토리
-            '/app/cookies.txt',  # Docker 환경
-            './cookies.txt'  # 상대 경로
-        ]
-        cookie_file = None
-        
-        for path in cookie_paths:
-            if os.path.exists(path):
-                cookie_file = path
-                break
-                
-        if cookie_file:
-            options['cookiefile'] = cookie_file
-            print(f"🍪 쿠키 파일 사용: {cookie_file}")
-        else:
-            # 파일이 없으면 기본값 사용
-            options['cookiefile'] = 'cookies.txt'
-            print("⚠️ 쿠키 파일을 찾을 수 없어 기본값 사용")
-        
-        return options
     
-    @staticmethod
-    def get_safari_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """대체 옵션: Safari 쿠키 사용"""
-        options = DownloadOptions.get_best_mp4_options(output_path, subtitle_langs)
-        
-        # Chrome 쿠키를 Safari로 대체
-        options['cookiesfrombrowser'] = ('safari',)
-        
-        return options
     
     @staticmethod
     def get_no_cookies_mp4_options(output_path: str, subtitle_langs: list = None) -> dict:
@@ -131,8 +87,6 @@ class DownloadOptions:
                 'best'                                              # 최종 폴백
             ),
             
-            # 쿠키 설정 - Chrome 우선 시도
-            'cookiesfrombrowser': ('chrome',),
             
             # 기본적인 설정만
             'sleep_interval': 1,

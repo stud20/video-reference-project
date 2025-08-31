@@ -1,0 +1,22 @@
+# Vimeo 수동 다운로드 명령어들
+
+## 1. 기본 시도
+yt-dlp "https://vimeo.com/662442279" -o "%(id)s_%(title)s.%(ext)s" -f "best[ext=mp4]" -v
+
+## 2. Player URL 사용 (권장)
+yt-dlp "https://player.vimeo.com/video/662442279" -o "%(id)s_%(title)s.%(ext)s" -f "best[ext=mp4]" --referer "https://vimeo.com/662442279" --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -v
+
+## 3. 최강 우회 모드 (모든 옵션)
+yt-dlp "https://player.vimeo.com/video/662442279" -o "%(id)s_%(title)s.%(ext)s" -f "best[ext=mp4]" --referer "https://vimeo.com/662442279" --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --geo-bypass --geo-bypass-country US --socket-timeout 120 --retries 30 --sleep-interval 5 --no-check-certificate --ignore-errors -v
+
+## 4. 정보만 확인
+yt-dlp "https://vimeo.com/662442279" --dump-json --no-download -v
+
+## 5. 최신 yt-dlp로 업데이트 후 시도
+pip install --upgrade yt-dlp
+yt-dlp "https://player.vimeo.com/video/662442279" -f "best"
+
+## Docker 환경에서 실행할 경우:
+docker exec -it sense-of-frame-dev bash
+cd /app
+yt-dlp "https://player.vimeo.com/video/662442279" -f "best[ext=mp4]" --referer "https://vimeo.com/662442279" -v

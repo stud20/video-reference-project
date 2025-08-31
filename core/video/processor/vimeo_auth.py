@@ -5,48 +5,26 @@ import os
 from typing import Optional, Dict, Any
 
 def add_authentication_options(options: dict) -> dict:
-    """Vimeo 인증 옵션 추가"""
+    """Vimeo 인증 옵션 추가 - 쿠키 없이"""
     
-    # 1. 브라우저 쿠키 사용 (가장 효과적)
-    try:
-        # Chrome 쿠키 우선 시도
-        options['cookiesfrombrowser'] = ('chrome',)
-    except:
-        try:
-            # Safari 쿠키 대안
-            options['cookiesfrombrowser'] = ('safari',)
-        except:
-            # Firefox 쿠키 대안
-            options['cookiesfrombrowser'] = ('firefox',)
-    
-    # 2. 쿠키 파일 경로 확인
-    cookie_paths = [
-        'cookies.txt',
-        '/app/cookies.txt',
-        './vimeo_cookies.txt',
-        os.path.expanduser('~/Downloads/cookies.txt')
-    ]
-    
-    for cookie_file in cookie_paths:
-        if os.path.exists(cookie_file):
-            options['cookiefile'] = cookie_file
-            break
-    
-    # 3. 추가 인증 헤더
+    # 기본 헤더만 설정
     if 'http_headers' not in options:
         options['http_headers'] = {}
     
+    # 쿠키/인증 관련 헤더 제거, 기본 헤더만 유지
     options['http_headers'].update({
-        'Cookie': '',  # 필요시 수동 쿠키 추가
-        'Authorization': '',  # 필요시 토큰 추가
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
     })
     
-    # 4. 비공개 영상 처리 옵션
+    # 기본 다운로드 옵션만
     options.update({
         'extract_flat': False,
-        'ignoreerrors': False,
+        'ignoreerrors': True,  # 에러 무시
         'skip_unavailable_fragments': True,
         'socket_timeout': 60,
+        'no_check_certificates': True
     })
     
     return options
@@ -75,7 +53,7 @@ def get_vimeo_access_methods() -> list:
     ]
 
 def add_docker_optimized_options(options: dict) -> dict:
-    """Docker 환경 최적화 옵션"""
+    """Docker 환경 최적화 옵션 - 쿠키 없이"""
     from core.video.processor.vimeo_patch import add_vimeo_fix
     
     options = add_vimeo_fix(options)
@@ -86,31 +64,29 @@ def add_docker_optimized_options(options: dict) -> dict:
         'read_timeout': 90,
         'retries': 20,
         'fragment_retries': 20,
-        'sleep_interval': 5
+        'sleep_interval': 5,
+        'ignoreerrors': True
     })
     return options
 
 def add_enhanced_headers(options: dict) -> dict:
-    """강화된 헤더 옵션"""
+    """강화된 헤더 옵션 - 쿠키 없이"""
     from core.video.processor.vimeo_patch import add_vimeo_fix
     
     options = add_vimeo_fix(options)
     if 'http_headers' not in options:
         options['http_headers'] = {}
     
-    # 더 강화된 헤더
+    # 쿠키 관련 헤더 제거, 기본 헤더만
     options['http_headers'].update({
         'DNT': '1',
         'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache',
-        'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="120"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Linux"'
+        'Cache-Control': 'no-cache'
     })
     return options
 
 def add_json_force(options: dict) -> dict:
-    """JSON 응답 강제"""
+    """JSON 응답 강제 - 쿠키 없이"""
     from core.video.processor.vimeo_patch import add_vimeo_fix
     
     options = add_vimeo_fix(options)
@@ -118,12 +94,13 @@ def add_json_force(options: dict) -> dict:
         'force_json': True,
         'dump_single_json': True,
         'simulate': False,
-        'skip_download': False
+        'skip_download': False,
+        'ignoreerrors': True
     })
     return options
 
 def add_basic_scraping(options: dict) -> dict:
-    """기본 스크래핑 방식"""
+    """기본 스크래핑 방식 - 쿠키 없이"""
     from core.video.processor.vimeo_patch import add_vimeo_fix
     
     options = add_vimeo_fix(options)
@@ -131,26 +108,6 @@ def add_basic_scraping(options: dict) -> dict:
         'extract_flat': False,
         'no_warnings': False,
         'ignoreerrors': True
-    })
-    return options
-
-def add_cookie_file(options: dict) -> dict:
-    """쿠키 파일 사용"""
-    cookie_paths = ['cookies.txt', '/app/cookies.txt', './vimeo_cookies.txt']
-    
-    for cookie_file in cookie_paths:
-        if os.path.exists(cookie_file):
-            options['cookiefile'] = cookie_file
-            return options
-    
-    # 쿠키 파일이 없으면 기본 옵션 반환
-    return options
-
-def add_direct_access(options: dict) -> dict:
-    """직접 접근 시도 (공개 영상용)"""
-    options.update({
-        'no_check_certificates': True,
-        'prefer_insecure': False,
     })
     return options
 
