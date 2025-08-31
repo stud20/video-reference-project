@@ -363,6 +363,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.11.1</strong> (2025-08-31) - yt-dlp curl_cffi impersonate 형식 수정으로 AssertionError 해결</p>
                         <p><strong>v2.11.0</strong> (2025-01-31) - curl_cffi 통합으로 Cloudflare 우회 및 브라우저 모방 구현</p>
                         <p><strong>v2.10.8</strong> (2025-01-31) - 모든 쿠키 설정 완전 제거 (Vimeo 다운로드 최적화)</p>
                         <p><strong>v2.10.7</strong> (2025-01-29) - Vimeo 다운로드 최강 우회 모드 적용</p>
@@ -404,6 +405,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.11.1</strong> (2025-08-31) - yt-dlp curl_cffi impersonate 형식 수정으로 AssertionError 해결</p>
                         <p><strong>v2.11.0</strong> (2025-01-31) - curl_cffi 통합으로 Cloudflare 우회 및 브라우저 모방 구현</p>
                         <p><strong>v2.10.8</strong> (2025-01-31) - 모든 쿠키 설정 완전 제거 (Vimeo 다운로드 최적화)</p>
                         <p><strong>v2.10.7</strong> (2025-01-29) - Vimeo 다운로드 최강 우회 모드 적용</p>
