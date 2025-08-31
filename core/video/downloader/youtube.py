@@ -9,6 +9,7 @@ from utils.logger import get_logger
 from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
 from core.video.processor.vimeo_patch import add_vimeo_fix, get_vimeo_player_url, extract_vimeo_id
+from core.video.processor.vimeo_auth import get_vimeo_access_methods, get_auth_error_message
 from config.settings import Settings
 
 logger = get_logger(__name__)
@@ -189,6 +190,97 @@ class YouTubeDownloader(VideoFetcher):
         
         raise Exception("예상치 못한 오류: 모든 방법 시도 완료했으나 성공하지 못함")
 
+    def _download_vimeo_with_auth(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
+        """Vimeo 전용 인증 다운로드 메서드"""
+        self.logger.info("🔐 Vimeo 인증 다운로드 시작...")
+        
+        # 비디오 ID 추출
+        video_id = extract_vimeo_id(url)
+        if not video_id:
+            raise ValueError("Vimeo 비디오 ID를 추출할 수 없습니다.")
+        
+        # 여러 접근 방법 시도
+        access_methods = get_vimeo_access_methods()
+        
+        for method_info in access_methods:
+            method_name = method_info['name']
+            method_func = method_info['method']
+            
+            try:
+                self.logger.info(f"🔄 {method_name} 시도 중...")
+                
+                # 기본 옵션 생성
+                if quality_option == "fast":
+                    base_options = self.download_options.get_fast_mp4_options(output_template)
+                elif quality_option == "balanced":
+                    base_options = self.download_options.get_balanced_mp4_options(output_template)
+                else:
+                    base_options = self.download_options.get_best_mp4_options(output_template)
+                
+                # Vimeo 패치 적용
+                ydl_opts = add_vimeo_fix(base_options)
+                
+                # 인증 방법 적용
+                ydl_opts = method_func(ydl_opts)
+                
+                # Player URL 사용
+                player_url = get_vimeo_player_url(video_id)
+                ydl_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(player_url, download=True)
+                    downloaded_file = ydl.prepare_filename(info)
+                    
+                    # 파일 확장자 확인
+                    if not os.path.exists(downloaded_file):
+                        base_name = os.path.splitext(downloaded_file)[0]
+                        for ext in ['.mp4', '.webm', '.mkv', '.mov']:
+                            test_file = base_name + ext
+                            if os.path.exists(test_file):
+                                downloaded_file = test_file
+                                break
+                
+                if os.path.exists(downloaded_file):
+                    self.logger.info(f"✅ {method_name}으로 성공!")
+                    return downloaded_file, info
+                else:
+                    raise FileNotFoundError("다운로드된 파일을 찾을 수 없음")
+                    
+            except Exception as e:
+                error_msg = str(e)
+                
+                # HTTP 오류 코드 확인
+                if "401" in error_msg:
+                    self.logger.warning(f"❌ {method_name} 실패: " + get_auth_error_message(401))
+                elif "403" in error_msg:
+                    self.logger.warning(f"❌ {method_name} 실패: " + get_auth_error_message(403))
+                else:
+                    self.logger.warning(f"❌ {method_name} 실패: {error_msg}")
+                
+                # 마지막 방법인지 확인
+                if method_name == access_methods[-1]['name']:
+                    # 모든 방법 실패 시 상세한 안내
+                    error_message = f"""
+🔒 Vimeo 비공개 영상 다운로드 실패
+
+이 영상은 다음 중 하나일 수 있습니다:
+1. 비공개 영상 (로그인 필요)
+2. 패스워드 보호 영상
+3. 특정 도메인에서만 재생 가능
+4. 다운로드가 비활성화됨
+
+해결 방법:
+1. Vimeo에 로그인한 브라우저에서 쿠키 내보내기
+2. 영상 소유자에게 공개 설정 요청
+3. 공개 영상 URL 확인
+
+마지막 오류: {error_msg}
+                    """
+                    raise Exception(error_message.strip())
+                continue
+        
+        raise Exception("예상치 못한 오류: 모든 Vimeo 인증 방법 시도 실패")
+
     def download(self, video: Video, progress_callback: Optional[Callable] = None) -> Tuple[str, VideoMetadata]:
         """
         비디오 다운로드 - 메타데이터 추출 및 macOS 호환성 보장
@@ -247,8 +339,13 @@ class YouTubeDownloader(VideoFetcher):
             self.logger.info(f"📥 다운로드 시작: {url} (품질: {quality_option})")
             self.logger.info(f"📁 저장 위치: {output_dir}")
             
-            # 5. 순차적 다운로드 시도 (Chrome -> Safari -> 쿠키없이)
-            downloaded_file, info = self._download_with_fallback(url, output_template, quality_option)
+            # 5. Vimeo 전용 처리 또는 일반 다운로드
+            if 'vimeo.com' in url:
+                self.logger.info("🎬 Vimeo 영상 감지 - 전용 인증 다운로드 시작")
+                downloaded_file, info = self._download_vimeo_with_auth(url, output_template, quality_option)
+            else:
+                # 5. 순차적 다운로드 시도 (Chrome -> Safari -> 쿠키없이)
+                downloaded_file, info = self._download_with_fallback(url, output_template, quality_option)
             
             # 6. macOS 호환성 확인 및 필요시 재인코딩
             self.logger.info("🎥 macOS 호환성 확인 중...")

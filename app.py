@@ -363,6 +363,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.10.3</strong> (2025-01-29) - Vimeo 401 Unauthorized 오류 해결 (브라우저 쿠키 인증)</p>
                         <p><strong>v2.10.2</strong> (2025-01-29) - Vimeo OAuth 오류 완전 해결 (Player URL 대안 사용)</p>
                         <p><strong>v2.10.1</strong> (2025-01-29) - Vimeo OAuth 오류 수정 (Android API 비활성화)</p>
                         <p><strong>v2.10.0</strong> (2025-01-29) - Docker 환경변수 경로 설정 기능 추가</p>
@@ -397,6 +398,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.10.3</strong> (2025-01-29) - Vimeo 401 Unauthorized 오류 해결 (브라우저 쿠키 인증)</p>
                         <p><strong>v2.10.2</strong> (2025-01-29) - Vimeo OAuth 오류 완전 해결 (Player URL 대안 사용)</p>
                         <p><strong>v2.10.1</strong> (2025-01-29) - Vimeo OAuth 오류 수정 (Android API 비활성화)</p>
                         <p><strong>v2.10.0</strong> (2025-01-29) - Docker 환경변수 경로 설정 기능 추가</p>
