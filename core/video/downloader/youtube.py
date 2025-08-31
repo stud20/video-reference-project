@@ -304,25 +304,68 @@ class YouTubeDownloader(VideoFetcher):
             # 1. 먼저 정보만 추출
             self.logger.info(f"📊 메타데이터 추출 중: {url}")
             # progress_callback 제거 (너무 자주 호출됨)
-            # Vimeo의 경우 OAuth 패치 적용
-            extract_opts = {'quiet': True, 'no_warnings': True}
+            # Vimeo의 경우 브라우저 쿠키 사용하여 메타데이터 추출
             if 'vimeo.com' in url:
-                extract_opts = add_vimeo_fix(extract_opts)
+                self.logger.info("🔐 Vimeo 메타데이터 추출 - 쿠키 인증 시도")
                 
-                # player URL로 변환 시도
+                # 브라우저 쿠키 방법들 순차 시도
+                auth_methods = [
+                    {'name': 'Chrome', 'cookies': ('chrome',)},
+                    {'name': 'Safari', 'cookies': ('safari',)},
+                    {'name': 'Firefox', 'cookies': ('firefox',)},
+                ]
+                
+                info = None
                 video_id = extract_vimeo_id(url)
-                if video_id:
-                    url = get_vimeo_player_url(video_id)
-                    extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
-                    self.logger.info(f"🔧 메타데이터 추출에 player URL 사용: {url}")
-            
-            with yt_dlp.YoutubeDL(extract_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+                
+                for method in auth_methods:
+                    try:
+                        self.logger.info(f"🔄 {method['name']} 쿠키로 메타데이터 추출 시도...")
+                        
+                        extract_opts = {
+                            'quiet': True,
+                            'no_warnings': True,
+                            'cookiesfrombrowser': method['cookies']
+                        }
+                        extract_opts = add_vimeo_fix(extract_opts)
+                        
+                        # player URL 사용
+                        if video_id:
+                            test_url = get_vimeo_player_url(video_id)
+                            extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                        else:
+                            test_url = url
+                        
+                        with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                            info = ydl.extract_info(test_url, download=False)
+                            if info:
+                                self.logger.info(f"✅ {method['name']} 쿠키로 메타데이터 추출 성공!")
+                                break
+                                
+                    except Exception as e:
+                        self.logger.warning(f"❌ {method['name']} 쿠키 실패: {str(e)}")
+                        continue
+                
+                if not info:
+                    # 모든 인증 방법 실패
+                    raise Exception("🔒 Vimeo 인증 실패: 모든 브라우저 쿠키 방법이 실패했습니다. 이 영상은 비공개이거나 로그인이 필요할 수 있습니다.")
+                
                 video_id = info.get('id', '')
-                video_title = info.get('title', 'untitled')
+                video_title = info.get('title', 'untitled') 
                 duration = info.get('duration', 0)
                 width = info.get('width', 0)
                 height = info.get('height', 0)
+                
+            else:
+                # YouTube 등 다른 플랫폼
+                extract_opts = {'quiet': True, 'no_warnings': True}
+                with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    video_id = info.get('id', '')
+                    video_title = info.get('title', 'untitled')
+                    duration = info.get('duration', 0)
+                    width = info.get('width', 0)
+                    height = info.get('height', 0)
             
             # Shorts 감지 (URL 패턴으로만)
             is_shorts = '/shorts/' in url
@@ -347,9 +390,9 @@ class YouTubeDownloader(VideoFetcher):
             self.logger.info(f"📁 저장 위치: {output_dir}")
             
             # 5. Vimeo 전용 처리 또는 일반 다운로드
-            if 'vimeo.com' in url:
+            if 'vimeo.com' in video.url:  # 원본 URL 확인
                 self.logger.info("🎬 Vimeo 영상 감지 - 전용 인증 다운로드 시작")
-                downloaded_file, info = self._download_vimeo_with_auth(url, output_template, quality_option)
+                downloaded_file, info = self._download_vimeo_with_auth(video.url, output_template, quality_option)
             else:
                 # 5. 순차적 다운로드 시도 (Chrome -> Safari -> 쿠키없이)
                 downloaded_file, info = self._download_with_fallback(url, output_template, quality_option)
@@ -439,20 +482,52 @@ class YouTubeDownloader(VideoFetcher):
         """
         # URL에서 video_id 추출
         normalized_url = self._normalize_url(url)
-        # Vimeo의 경우 OAuth 패치 적용
-        extract_opts = {'quiet': True, 'no_warnings': True}
-        if 'vimeo.com' in normalized_url:
-            extract_opts = add_vimeo_fix(extract_opts)
-            
-            # player URL로 변환 시도
-            video_id = extract_vimeo_id(normalized_url)
-            if video_id:
-                normalized_url = get_vimeo_player_url(video_id)
-                extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
         
-        with yt_dlp.YoutubeDL(extract_opts) as ydl:
-            info = ydl.extract_info(normalized_url, download=False)
+        # Vimeo의 경우 브라우저 쿠키로 메타데이터 추출
+        if 'vimeo.com' in normalized_url:
+            self.logger.info("🔐 Vimeo 메타데이터 추출 (Legacy) - 쿠키 인증")
+            
+            auth_methods = [
+                {'name': 'Chrome', 'cookies': ('chrome',)},
+                {'name': 'Safari', 'cookies': ('safari',)},
+            ]
+            
+            info = None
+            video_id = extract_vimeo_id(normalized_url)
+            
+            for method in auth_methods:
+                try:
+                    extract_opts = {
+                        'quiet': True,
+                        'no_warnings': True,
+                        'cookiesfrombrowser': method['cookies']
+                    }
+                    extract_opts = add_vimeo_fix(extract_opts)
+                    
+                    test_url = get_vimeo_player_url(video_id) if video_id else normalized_url
+                    if video_id:
+                        extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                    
+                    with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                        info = ydl.extract_info(test_url, download=False)
+                        if info:
+                            self.logger.info(f"✅ Legacy: {method['name']} 쿠키 성공!")
+                            break
+                            
+                except Exception as e:
+                    self.logger.warning(f"❌ Legacy: {method['name']} 실패: {str(e)}")
+                    continue
+            
+            if not info:
+                raise Exception("🔒 Vimeo Legacy 다운로드 실패: 브라우저 인증이 필요합니다.")
+                
             video_id = info.get('id', 'temp')
+        else:
+            # YouTube 등 다른 플랫폼
+            extract_opts = {'quiet': True, 'no_warnings': True}
+            with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                info = ydl.extract_info(normalized_url, download=False)
+                video_id = info.get('id', 'temp')
         
         # Video 객체 생성 - 올바른 session_dir 사용
         video = Video(session_id=video_id, url=url, local_path="")
