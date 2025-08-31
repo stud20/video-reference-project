@@ -230,9 +230,15 @@ class YouTubeDownloader(VideoFetcher):
                 # 인증 방법 적용
                 ydl_opts = method_func(ydl_opts)
                 
-                # Player URL 사용
+                # Player URL 사용 (Docker 환경 최적화)
                 player_url = get_vimeo_player_url(video_id)
                 ydl_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                
+                # Docker 환경에서 추가 설정
+                if 'no_check_certificates' not in ydl_opts:
+                    ydl_opts['no_check_certificates'] = True
+                
+                self.logger.info(f"🎬 Player URL 사용: {player_url}")
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(player_url, download=True)

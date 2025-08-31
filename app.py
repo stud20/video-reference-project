@@ -363,6 +363,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.10.7</strong> (2025-01-29) - Vimeo 다운로드 최강 우회 모드 적용</p>
                         <p><strong>v2.10.6</strong> (2025-01-29) - Docker Linux 환경 Vimeo 처리 최적화 (쿠키 없이)</p>
                         <p><strong>v2.10.5</strong> (2025-01-29) - Vimeo 메타데이터 추출 단계 브라우저 쿠키 인증 추가</p>
                         <p><strong>v2.10.4</strong> (2025-01-29) - Vimeo URL 라우팅 문제 수정</p>
@@ -401,6 +402,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.10.7</strong> (2025-01-29) - Vimeo 다운로드 최강 우회 모드 적용</p>
                         <p><strong>v2.10.6</strong> (2025-01-29) - Docker Linux 환경 Vimeo 처리 최적화 (쿠키 없이)</p>
                         <p><strong>v2.10.5</strong> (2025-01-29) - Vimeo 메타데이터 추출 단계 브라우저 쿠키 인증 추가</p>
                         <p><strong>v2.10.4</strong> (2025-01-29) - Vimeo URL 라우팅 문제 수정</p>

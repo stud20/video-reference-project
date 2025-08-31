@@ -31,17 +31,23 @@ def add_vimeo_fix(options: dict) -> dict:
         'Cache-Control': 'max-age=0'
     })
     
-    # Docker/Linux 환경 최적화 옵션
+    # Docker/Linux 환경 최적화 옵션 - 최강 우회 모드
     options.update({
         'geo_bypass': True,
+        'geo_bypass_country': 'US',
         'nocheckcertificate': True,
-        'sleep_interval': 3,  # Docker 환경에서 더 긴 간격
-        'retries': 15,  # 재시도 횟수 대폭 증가
-        'fragment_retries': 15,
-        'socket_timeout': 60,
-        'read_timeout': 60,
-        'prefer_insecure': False,
-        'force_json': True  # JSON 응답 강제
+        'sleep_interval': 8,  # 더 긴 간격으로 탐지 우회
+        'retries': 30,  # 재시도 횟수 최대 증가
+        'fragment_retries': 30,
+        'socket_timeout': 120,
+        'read_timeout': 120,
+        'prefer_insecure': True,  # 보안 우회
+        'force_json': True,
+        'skip_unavailable_fragments': True,
+        'ignore_no_formats_error': True,
+        'ignore_config': True,
+        'no_color': True,
+        'call_home': False  # 통신 최소화
     })
     
     return options

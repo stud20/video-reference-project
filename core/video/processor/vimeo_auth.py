@@ -52,25 +52,87 @@ def add_authentication_options(options: dict) -> dict:
     return options
 
 def get_vimeo_access_methods() -> list:
-    """Vimeo 접근 방법들 우선순위 순으로 반환"""
+    """Vimeo 접근 방법들 우선순위 순으로 반환 - Docker 환경 최적화"""
+    from core.video.processor.vimeo_patch import add_vimeo_fix, get_vimeo_player_url, extract_vimeo_id
+    
     return [
         {
-            'name': 'Chrome 쿠키 방식',
-            'method': lambda options: {**options, 'cookiesfrombrowser': ('chrome',)}
+            'name': 'Player API 직접 우회',
+            'method': lambda options: add_docker_optimized_options(options)
         },
         {
-            'name': 'Safari 쿠키 방식', 
-            'method': lambda options: {**options, 'cookiesfrombrowser': ('safari',)}
+            'name': '강화된 헤더 방식',
+            'method': lambda options: add_enhanced_headers(options)
         },
         {
-            'name': '쿠키 파일 방식',
-            'method': lambda options: add_cookie_file(options)
+            'name': 'JSON 강제 추출',
+            'method': lambda options: add_json_force(options)
         },
         {
-            'name': '직접 접근 방식',
-            'method': lambda options: add_direct_access(options)
+            'name': '기본 스크래핑',
+            'method': lambda options: add_basic_scraping(options)
         }
     ]
+
+def add_docker_optimized_options(options: dict) -> dict:
+    """Docker 환경 최적화 옵션"""
+    from core.video.processor.vimeo_patch import add_vimeo_fix
+    
+    options = add_vimeo_fix(options)
+    options.update({
+        'no_check_certificates': True,
+        'prefer_insecure': True,
+        'socket_timeout': 90,
+        'read_timeout': 90,
+        'retries': 20,
+        'fragment_retries': 20,
+        'sleep_interval': 5
+    })
+    return options
+
+def add_enhanced_headers(options: dict) -> dict:
+    """강화된 헤더 옵션"""
+    from core.video.processor.vimeo_patch import add_vimeo_fix
+    
+    options = add_vimeo_fix(options)
+    if 'http_headers' not in options:
+        options['http_headers'] = {}
+    
+    # 더 강화된 헤더
+    options['http_headers'].update({
+        'DNT': '1',
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache',
+        'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="120"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Linux"'
+    })
+    return options
+
+def add_json_force(options: dict) -> dict:
+    """JSON 응답 강제"""
+    from core.video.processor.vimeo_patch import add_vimeo_fix
+    
+    options = add_vimeo_fix(options)
+    options.update({
+        'force_json': True,
+        'dump_single_json': True,
+        'simulate': False,
+        'skip_download': False
+    })
+    return options
+
+def add_basic_scraping(options: dict) -> dict:
+    """기본 스크래핑 방식"""
+    from core.video.processor.vimeo_patch import add_vimeo_fix
+    
+    options = add_vimeo_fix(options)
+    options.update({
+        'extract_flat': False,
+        'no_warnings': False,
+        'ignoreerrors': True
+    })
+    return options
 
 def add_cookie_file(options: dict) -> dict:
     """쿠키 파일 사용"""
