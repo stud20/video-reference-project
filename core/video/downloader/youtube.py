@@ -8,7 +8,7 @@ from core.video.models import Video, VideoMetadata
 from utils.logger import get_logger
 from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
-from core.video.processor.vimeo_patch import add_vimeo_fix
+from core.video.processor.vimeo_patch import add_vimeo_fix, get_vimeo_player_url, extract_vimeo_id
 from config.settings import Settings
 
 logger = get_logger(__name__)
@@ -145,10 +145,21 @@ class YouTubeDownloader(VideoFetcher):
                 self.logger.info(f"🔄 {method_name} 방식으로 시도 중...")
                 ydl_opts = get_options()
                 
-                # Vimeo URL인 경우 OAuth 패치 적용
+                # Vimeo URL인 경우 OAuth 패치 적용 및 대안 URL 시도
                 if 'vimeo.com' in url:
                     ydl_opts = add_vimeo_fix(ydl_opts)
-                    self.logger.info("🔧 Vimeo OAuth 패치 적용")
+                    
+                    # GitHub 해결책: player URL 사용
+                    video_id = extract_vimeo_id(url)
+                    if video_id:
+                        player_url = get_vimeo_player_url(video_id)
+                        self.logger.info(f"🔧 Vimeo OAuth 패치 적용 및 player URL 사용: {player_url}")
+                        # 원본 URL 대신 player URL 사용
+                        url = player_url
+                        # Referer 설정
+                        ydl_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                    else:
+                        self.logger.info("🔧 Vimeo OAuth 패치 적용")
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
@@ -198,6 +209,13 @@ class YouTubeDownloader(VideoFetcher):
             extract_opts = {'quiet': True, 'no_warnings': True}
             if 'vimeo.com' in url:
                 extract_opts = add_vimeo_fix(extract_opts)
+                
+                # player URL로 변환 시도
+                video_id = extract_vimeo_id(url)
+                if video_id:
+                    url = get_vimeo_player_url(video_id)
+                    extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
+                    self.logger.info(f"🔧 메타데이터 추출에 player URL 사용: {url}")
             
             with yt_dlp.YoutubeDL(extract_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -321,6 +339,12 @@ class YouTubeDownloader(VideoFetcher):
         extract_opts = {'quiet': True, 'no_warnings': True}
         if 'vimeo.com' in normalized_url:
             extract_opts = add_vimeo_fix(extract_opts)
+            
+            # player URL로 변환 시도
+            video_id = extract_vimeo_id(normalized_url)
+            if video_id:
+                normalized_url = get_vimeo_player_url(video_id)
+                extract_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
         
         with yt_dlp.YoutubeDL(extract_opts) as ydl:
             info = ydl.extract_info(normalized_url, download=False)

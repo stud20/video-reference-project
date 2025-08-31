@@ -7,7 +7,7 @@ plotly>=5.17.0
 psutil>=5.9.0
 
 # ===== 영상 처리 및 다운로드 =====
-yt-dlp>=2023.10.13          # YouTube/Vimeo 다운로드
+yt-dlp>=2025.01.27          # YouTube/Vimeo 다운로드 (Vimeo OAuth 수정 포함)
 opencv-python>=4.8.1.78     # 영상 처리, 프레임 추출
 Pillow>=10.0.1              # 이미지 처리
 imagehash>=4.3.1            # 지각적 해시 (씬 유사도 비교)
