@@ -2,7 +2,14 @@
 """yt-dlp 다운로드 옵션 설정 - macOS 재생 호환성 중심"""
 
 import os
-from yt_dlp.networking.impersonate import ImpersonateTarget
+from typing import Union
+
+try:
+    from yt_dlp.networking.impersonate import ImpersonateTarget
+    CURL_CFFI_AVAILABLE = True
+except ImportError:
+    ImpersonateTarget = None
+    CURL_CFFI_AVAILABLE = False
 
 
 
@@ -50,9 +57,8 @@ class DownloadOptions:
                 'best'                         # 최종 폴백
             ),
             
-            # curl_cffi 사용 설정 - 핵심!
-            'http_client': 'curl_cffi',
-            'impersonate': impersonate_target,  # ImpersonateTarget 객체 사용
+            # curl_cffi 사용 설정 - ImpersonateTarget 객체만으로 충분
+            'impersonate': impersonate_target if CURL_CFFI_AVAILABLE else None,
             
             # 브라우저 모방 헤더 (curl_cffi가 자동으로 설정하지만 추가 보강)
             'http_headers': {
