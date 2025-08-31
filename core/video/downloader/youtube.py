@@ -52,20 +52,27 @@ class YouTubeDownloader(VideoFetcher):
 
     def _normalize_url(self, url: str) -> str:
         """
-        YouTube URL을 표준 형식으로 정규화
+        URL을 표준 형식으로 정규화 (YouTube/Vimeo 지원)
         
         지원하는 형식:
+        YouTube:
         - https://www.youtube.com/watch?v=VIDEO_ID&param=value
         - https://youtu.be/VIDEO_ID?param=value
-        - https://youtube.com/watch?v=VIDEO_ID
-        - https://m.youtube.com/watch?v=VIDEO_ID
+        Vimeo:
+        - https://vimeo.com/VIDEO_ID
+        - https://player.vimeo.com/video/VIDEO_ID
         
         Returns:
-            표준 형식 URL: https://www.youtube.com/watch?v=VIDEO_ID
+            표준 형식 URL
         """
         try:
-            # 비디오 ID 추출을 위한 패턴들
-            patterns = [
+            # Vimeo URL인 경우 그대로 반환 (별도 처리 없음)
+            if 'vimeo.com' in url:
+                self.logger.info(f"Vimeo URL 감지: {url}")
+                return url
+            
+            # YouTube 비디오 ID 추출을 위한 패턴들
+            youtube_patterns = [
                 # YouTube Shorts URL
                 r'(?:https?://)?(?:www\.)?(?:m\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})',
                 # 표준 YouTube URL
@@ -79,20 +86,20 @@ class YouTubeDownloader(VideoFetcher):
             ]
             
             video_id = None
-            for pattern in patterns:
+            for pattern in youtube_patterns:
                 match = re.search(pattern, url)
                 if match:
                     video_id = match.group(1)
                     break
             
             if not video_id:
-                # URL이 유효하지 않은 경우 원본 반환
-                self.logger.warning(f"YouTube 비디오 ID를 추출할 수 없습니다: {url}")
+                # YouTube가 아니라면 원본 반환 (다른 플랫폼일 수 있음)
+                self.logger.info(f"YouTube 패턴이 아닌 URL - 원본 사용: {url}")
                 return url
             
-            # 표준 형식으로 변환
+            # YouTube 표준 형식으로 변환
             normalized_url = f"https://www.youtube.com/watch?v={video_id}"
-            self.logger.info(f"URL 정규화: {url} -> {normalized_url}")
+            self.logger.info(f"YouTube URL 정규화: {url} -> {normalized_url}")
             
             return normalized_url
             

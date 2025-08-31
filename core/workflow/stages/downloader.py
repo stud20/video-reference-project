@@ -3,6 +3,7 @@
 
 import os
 from core.video.downloader.youtube import YouTubeDownloader
+from core.video.downloader.vimeo import VimeoDownloader
 from core.video.models import Video, VideoMetadata
 from config.settings import Settings
 
@@ -14,7 +15,8 @@ class DownloadStage(PipelineStage):
     
     def __init__(self):
         super().__init__("download")
-        self.downloader = YouTubeDownloader()
+        self.youtube_downloader = YouTubeDownloader()
+        self.vimeo_downloader = VimeoDownloader()
     
     def can_skip(self, context: PipelineContext) -> bool:
         """캐시 히트 시 스킵"""
@@ -24,8 +26,11 @@ class DownloadStage(PipelineStage):
         """다운로드 실행"""
         self.update_progress(0, "📥 영상 다운로드 시작...", context)
         
+        # YouTube 다운로더가 모든 플랫폼을 지원하므로 통합 사용
+        self.logger.info(f"📥 {context.platform} 영상 다운로드 (통합 다운로더)")
+        
         # 다운로드 실행 (내부 progress callback 없이)
-        download_result = self.downloader.download_legacy(context.url, None)
+        download_result = self.youtube_downloader.download_legacy(context.url, None)
         
         context.download_result = download_result
         
