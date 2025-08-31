@@ -12,7 +12,7 @@ class DownloadOptions:
     NON_PLAYABLE_CODECS = {"vp9", "vp8", "av1", "vp09", "vp08", "vp10"}
     
     @staticmethod
-    def get_curl_cffi_options(output_path: str, impersonate: str = "chrome120", subtitle_langs: list = None) -> dict:
+    def get_curl_cffi_options(output_path: str, impersonate: str = "chrome-110:windows-10", subtitle_langs: list = None) -> dict:
         """curl_cffi를 사용한 브라우저 모방 옵션 - Cloudflare 우회 특화"""
         return {
             'outtmpl': output_path,
@@ -78,7 +78,7 @@ class DownloadOptions:
     def get_aggressive_bypass_options(output_path: str, subtitle_langs: list = None) -> dict:
         """최강 우회 옵션 - curl_cffi 기본 사용"""
         # 기본적으로 curl_cffi 옵션을 사용
-        return DownloadOptions.get_curl_cffi_options(output_path, "chrome120", subtitle_langs)
+        return DownloadOptions.get_curl_cffi_options(output_path, "chrome-110:windows-10", subtitle_langs)
     
     
     

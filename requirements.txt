@@ -8,7 +8,7 @@ psutil>=5.9.0
 
 # ===== 영상 처리 및 다운로드 =====
 yt-dlp>=2025.01.27          # YouTube/Vimeo 다운로드 (Vimeo OAuth 수정 포함)
-curl-cffi>=0.5.10          # TLS/HTTP2 핑거프린트 브라우저 모방 (Cloudflare 우회)
+curl-cffi==0.5.10          # TLS/HTTP2 핑거프린트 브라우저 모방 (Cloudflare 우회, 안정 버전)
 opencv-python>=4.8.1.78     # 영상 처리, 프레임 추출
 Pillow>=10.0.1              # 이미지 처리
 imagehash>=4.3.1            # 지각적 해시 (씬 유사도 비교)

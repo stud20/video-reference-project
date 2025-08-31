@@ -182,7 +182,7 @@ class YouTubeDownloader(VideoFetcher):
         
         # 먼저 접근성 테스트
         self.logger.info("🔍 curl_cffi로 접근성 테스트 중...")
-        accessibility = test_vimeo_accessibility_cffi(url, "chrome120")
+        accessibility = test_vimeo_accessibility_cffi(url, "chrome-110:windows-10")
         
         if not accessibility.get('accessible') and accessibility.get('status_code') == 503:
             self.logger.warning("🛡 Cloudflare 차단 감지 - 다양한 브라우저 모방 시도")

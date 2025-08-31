@@ -120,7 +120,7 @@ def check_video_accessibility(url: str) -> Dict[str, Any]:
         response = cffi_requests.head(
             url, 
             timeout=30,
-            impersonate="chrome120",
+            impersonate="chrome-110:windows-10",
             headers={
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',

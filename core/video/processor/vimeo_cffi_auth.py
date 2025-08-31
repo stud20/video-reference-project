@@ -11,23 +11,23 @@ def get_vimeo_cffi_access_methods() -> List[Dict[str, Any]]:
     """Vimeo curl_cffi 접근 방법들 우선순위 순으로 반환"""
     return [
         {
-            'name': 'Chrome 120 모방',
-            'impersonate': 'chrome120',
+            'name': 'Chrome 110 모방',
+            'impersonate': 'chrome-110:windows-10',
             'method': lambda options: add_cffi_chrome_options(options)
         },
         {
-            'name': 'Safari 17 모방',
-            'impersonate': 'safari17_0', 
+            'name': 'Safari 15.5 모방',
+            'impersonate': 'safari-15.5:macos-12', 
             'method': lambda options: add_cffi_safari_options(options)
         },
         {
             'name': 'Edge 101 모방',
-            'impersonate': 'edge101',
+            'impersonate': 'edge-101:windows-10',
             'method': lambda options: add_cffi_edge_options(options)
         },
         {
-            'name': 'Chrome 110 모방 (Fallback)',
-            'impersonate': 'chrome110',
+            'name': 'Chrome 99 모방 (Fallback)',
+            'impersonate': 'chrome-99:windows-10',
             'method': lambda options: add_cffi_chrome_fallback_options(options)
         }
     ]
@@ -37,7 +37,7 @@ def add_cffi_chrome_options(options: dict) -> dict:
     """Chrome 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'chrome120',
+        'impersonate': 'chrome-110:windows-10',
         
         # Chrome 특화 헤더
         'http_headers': {
@@ -81,7 +81,7 @@ def add_cffi_safari_options(options: dict) -> dict:
     """Safari 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'safari17_0',
+        'impersonate': 'safari-15.5:macos-12',
         
         # Safari 특화 헤더
         'http_headers': {
@@ -116,7 +116,7 @@ def add_cffi_edge_options(options: dict) -> dict:
     """Edge 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'edge101',
+        'impersonate': 'edge-101:windows-10',
         
         # Edge 특화 헤더
         'http_headers': {
@@ -157,7 +157,7 @@ def add_cffi_chrome_fallback_options(options: dict) -> dict:
     """Chrome 110 폴백 옵션 (더 안정적인 버전)"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'chrome110',
+        'impersonate': 'chrome-99:windows-10',
         
         # 더 기본적인 헤더
         'http_headers': {
@@ -191,7 +191,7 @@ def add_cffi_chrome_fallback_options(options: dict) -> dict:
     return options
 
 
-def test_vimeo_accessibility_cffi(url: str, impersonate: str = "chrome120") -> Dict[str, Any]:
+def test_vimeo_accessibility_cffi(url: str, impersonate: str = "chrome-110:windows-10") -> Dict[str, Any]:
     """curl_cffi를 사용하여 Vimeo 접근성 테스트"""
     try:
         # curl_cffi로 직접 요청 테스트
@@ -259,7 +259,7 @@ def get_cffi_error_message(status_code: int, error_details: Dict[str, Any] = Non
     return message
 
 
-def add_vimeo_cffi_authentication(options: dict, impersonate: str = "chrome120") -> dict:
+def add_vimeo_cffi_authentication(options: dict, impersonate: str = "chrome-110:windows-10") -> dict:
     """Vimeo용 curl_cffi 인증 옵션 추가 (통합 함수)"""
     
     # 기본 curl_cffi 설정
