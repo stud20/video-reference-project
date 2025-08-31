@@ -10,6 +10,7 @@ from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
 from core.video.processor.vimeo_patch import add_vimeo_fix, get_vimeo_player_url, extract_vimeo_id
 from core.video.processor.vimeo_auth import get_vimeo_access_methods, get_auth_error_message
+from core.video.processor.vimeo_cffi_auth import get_vimeo_cffi_access_methods, add_vimeo_cffi_authentication, test_vimeo_accessibility_cffi
 from config.settings import Settings
 
 logger = get_logger(__name__)
@@ -170,48 +171,47 @@ class YouTubeDownloader(VideoFetcher):
         
         raise Exception("예상치 못한 오류: 모든 방법 시도 완료했으나 성공하지 못함")
 
-    def _download_vimeo_with_auth(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
-        """Vimeo 전용 인증 다운로드 메서드"""
-        self.logger.info("🔐 Vimeo 인증 다운로드 시작...")
+    def _download_vimeo_with_cffi(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
+        """Vimeo curl_cffi 기반 다운로드 메서드 - Cloudflare 우회"""
+        self.logger.info("🚀 Vimeo curl_cffi 다운로드 시작...")
         
         # 비디오 ID 추출
         video_id = extract_vimeo_id(url)
         if not video_id:
             raise ValueError("Vimeo 비디오 ID를 추출할 수 없습니다.")
         
-        # 여러 접근 방법 시도
-        access_methods = get_vimeo_access_methods()
+        # 먼저 접근성 테스트
+        self.logger.info("🔍 curl_cffi로 접근성 테스트 중...")
+        accessibility = test_vimeo_accessibility_cffi(url, "chrome120")
         
-        for method_info in access_methods:
+        if not accessibility.get('accessible') and accessibility.get('status_code') == 503:
+            self.logger.warning("🛡 Cloudflare 차단 감지 - 다양한 브라우저 모방 시도")
+        
+        # curl_cffi 기반 접근 방법들 시도
+        cffi_methods = get_vimeo_cffi_access_methods()
+        
+        for method_info in cffi_methods:
             method_name = method_info['name']
+            impersonate = method_info['impersonate']
             method_func = method_info['method']
             
             try:
-                self.logger.info(f"🔄 {method_name} 시도 중...")
+                self.logger.info(f"🔄 {method_name} ({impersonate}) 시도 중...")
                 
                 # 기본 옵션 생성
-                if quality_option == "fast":
-                    base_options = self.download_options.get_fast_mp4_options(output_template)
-                elif quality_option == "balanced":
-                    base_options = self.download_options.get_balanced_mp4_options(output_template)
-                else:
-                    base_options = self.download_options.get_best_mp4_options(output_template)
+                base_options = self.download_options.get_curl_cffi_options(output_template, impersonate)
                 
-                # Vimeo 패치 적용
-                ydl_opts = add_vimeo_fix(base_options)
+                # curl_cffi 인증 설정 적용
+                ydl_opts = add_vimeo_cffi_authentication(base_options, impersonate)
                 
-                # 인증 방법 적용
+                # 추가 메서드별 설정 적용
                 ydl_opts = method_func(ydl_opts)
                 
-                # Player URL 사용 (Docker 환경 최적화)
+                # Player URL 사용 (Vimeo OAuth 우회)
                 player_url = get_vimeo_player_url(video_id)
                 ydl_opts['http_headers']['Referer'] = f"https://vimeo.com/{video_id}"
                 
-                # Docker 환경에서 추가 설정
-                if 'no_check_certificates' not in ydl_opts:
-                    ydl_opts['no_check_certificates'] = True
-                
-                self.logger.info(f"🎬 Player URL 사용: {player_url}")
+                self.logger.info(f"🎬 Player URL 사용 ({impersonate}): {player_url}")
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(player_url, download=True)
@@ -227,7 +227,7 @@ class YouTubeDownloader(VideoFetcher):
                                 break
                 
                 if os.path.exists(downloaded_file):
-                    self.logger.info(f"✅ {method_name}으로 성공!")
+                    self.logger.info(f"✅ {method_name} ({impersonate})으로 성공!")
                     return downloaded_file, info
                 else:
                     raise FileNotFoundError("다운로드된 파일을 찾을 수 없음")
@@ -235,37 +235,36 @@ class YouTubeDownloader(VideoFetcher):
             except Exception as e:
                 error_msg = str(e)
                 
-                # HTTP 오류 코드 확인
-                if "401" in error_msg:
-                    self.logger.warning(f"❌ {method_name} 실패: " + get_auth_error_message(401))
+                # curl_cffi 특화 오류 분석
+                if "503" in error_msg or "cloudflare" in error_msg.lower():
+                    self.logger.warning(f"❌ {method_name} Cloudflare 차단: {error_msg}")
+                elif "401" in error_msg:
+                    self.logger.warning(f"❌ {method_name} 인증 필요: {error_msg}")
                 elif "403" in error_msg:
-                    self.logger.warning(f"❌ {method_name} 실패: " + get_auth_error_message(403))
+                    self.logger.warning(f"❌ {method_name} 접근 금지: {error_msg}")
                 else:
                     self.logger.warning(f"❌ {method_name} 실패: {error_msg}")
                 
                 # 마지막 방법인지 확인
-                if method_name == access_methods[-1]['name']:
-                    # 모든 방법 실패 시 상세한 안내
+                if method_name == cffi_methods[-1]['name']:
+                    # 모든 curl_cffi 방법 실패 시 안내
                     error_message = f"""
-🔒 Vimeo 비공개 영상 다운로드 실패
+🚀 curl_cffi 기반 모든 브라우저 모방 실패
+
+시도한 방법들:
+{', '.join([m['name'] for m in cffi_methods])}
 
 이 영상은 다음 중 하나일 수 있습니다:
-1. 비공개 영상 (로그인 필요)
-2. 패스워드 보호 영상
-3. 특정 도메인에서만 재생 가능
-4. 다운로드가 비활성화됨
-
-해결 방법:
-1. Vimeo에 로그인한 브라우저에서 쿠키 내보내기
-2. 영상 소유자에게 공개 설정 요청
-3. 공개 영상 URL 확인
+1. 고도화된 Bot Detection (curl_cffi로도 차단)
+2. 실제 비공개/패스워드 보호 영상
+3. 지역 제한 또는 특수 권한 필요
 
 마지막 오류: {error_msg}
                     """
                     raise Exception(error_message.strip())
                 continue
         
-        raise Exception("예상치 못한 오류: 모든 Vimeo 인증 방법 시도 실패")
+        raise Exception("예상치 못한 오류: 모든 curl_cffi 방법 시도 실패")
 
     def download(self, video: Video, progress_callback: Optional[Callable] = None) -> Tuple[str, VideoMetadata]:
         """
@@ -396,12 +395,12 @@ class YouTubeDownloader(VideoFetcher):
             self.logger.info(f"📥 다운로드 시작: {url} (품질: {quality_option})")
             self.logger.info(f"📁 저장 위치: {output_dir}")
             
-            # 5. Vimeo 전용 처리 또는 일반 다운로드
+            # 5. Vimeo curl_cffi 처리 또는 일반 다운로드
             if 'vimeo.com' in video.url:  # 원본 URL 확인
-                self.logger.info("🎬 Vimeo 영상 감지 - 전용 인증 다운로드 시작")
-                downloaded_file, info = self._download_vimeo_with_auth(video.url, output_template, quality_option)
+                self.logger.info("🚀 Vimeo 영상 감지 - curl_cffi 기반 다운로드 시작")
+                downloaded_file, info = self._download_vimeo_with_cffi(video.url, output_template, quality_option)
             else:
-                # 5. 순차적 다운로드 시도 (Chrome -> Safari -> 쿠키없이)
+                # 5. 순차적 다운로드 시도 (쿠키 없는 방법들)
                 downloaded_file, info = self._download_with_fallback(url, output_template, quality_option)
             
             # 6. macOS 호환성 확인 및 필요시 재인코딩

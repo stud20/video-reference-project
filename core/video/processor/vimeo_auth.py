@@ -112,22 +112,56 @@ def add_basic_scraping(options: dict) -> dict:
     return options
 
 def check_video_accessibility(url: str) -> Dict[str, Any]:
-    """비디오 접근 가능성 확인"""
-    import requests
-    
+    """비디오 접근 가능성 확인 - curl_cffi 사용"""
     try:
-        response = requests.head(url, timeout=10)
+        import curl_cffi.requests as cffi_requests
+        
+        # Chrome 브라우저로 모방하여 요청
+        response = cffi_requests.head(
+            url, 
+            timeout=30,
+            impersonate="chrome120",
+            headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'DNT': '1',
+                'Upgrade-Insecure-Requests': '1'
+            }
+        )
+        
         return {
             'accessible': response.status_code == 200,
             'status_code': response.status_code,
             'requires_auth': response.status_code in [401, 403],
-            'is_private': 'private' in response.headers.get('x-vimeo-privacy', '').lower()
+            'is_private': 'private' in response.headers.get('x-vimeo-privacy', '').lower(),
+            'cloudflare_bypassed': response.status_code != 503,
+            'used_curl_cffi': True
         }
+    except ImportError:
+        # curl_cffi가 없으면 기본 방법 사용
+        import requests
+        try:
+            response = requests.head(url, timeout=10)
+            return {
+                'accessible': response.status_code == 200,
+                'status_code': response.status_code,
+                'requires_auth': response.status_code in [401, 403],
+                'is_private': 'private' in response.headers.get('x-vimeo-privacy', '').lower(),
+                'used_curl_cffi': False
+            }
+        except Exception as e:
+            return {
+                'accessible': False,
+                'error': str(e),
+                'requires_auth': True,
+                'used_curl_cffi': False
+            }
     except Exception as e:
         return {
             'accessible': False,
             'error': str(e),
-            'requires_auth': True
+            'requires_auth': True,
+            'used_curl_cffi': True
         }
 
 def get_auth_error_message(status_code: int) -> str:

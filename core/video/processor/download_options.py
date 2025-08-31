@@ -12,8 +12,8 @@ class DownloadOptions:
     NON_PLAYABLE_CODECS = {"vp9", "vp8", "av1", "vp09", "vp08", "vp10"}
     
     @staticmethod
-    def get_aggressive_bypass_options(output_path: str, subtitle_langs: list = None) -> dict:
-        """최강 우회 옵션 - 고품질 유지하면서 안정적인 접근"""
+    def get_curl_cffi_options(output_path: str, impersonate: str = "chrome120", subtitle_langs: list = None) -> dict:
+        """curl_cffi를 사용한 브라우저 모방 옵션 - Cloudflare 우회 특화"""
         return {
             'outtmpl': output_path,
             
@@ -25,31 +25,60 @@ class DownloadOptions:
                 'best'                         # 최종 폴백
             ),
             
-            # 기본 User-Agent
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            # curl_cffi 사용 설정 - 핵심!
+            'http_client': 'curl_cffi',
+            'impersonate': impersonate,  # chrome120, safari17_0, edge101 등
             
-            # 적당한 요청 간격
-            'sleep_interval': 3,
-            'max_sleep_interval': 10,
+            # 브라우저 모방 헤더 (curl_cffi가 자동으로 설정하지만 추가 보강)
+            'http_headers': {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            },
             
-            # 적당한 재시도
-            'retries': 5,
-            'fragment_retries': 5,
+            # 연결 설정
+            'socket_timeout': 60,
+            'read_timeout': 60,
+            'retries': 10,
+            'fragment_retries': 10,
+            'sleep_interval': 2,
+            'max_sleep_interval': 8,
             
-            # 지역 우회만
+            # 지역 우회
             'geo_bypass': True,
+            'geo_bypass_country': 'US',
             
-            # 기본 설정만
-            'no_warnings': False,
-            'ignoreerrors': False,
+            # SSL/TLS 설정
+            'nocheckcertificate': True,
+            'prefer_insecure': False,  # curl_cffi는 정상적인 TLS 사용
             
             # Vimeo OAuth 문제 해결
             'extractor_args': {
                 'vimeo': {
-                    'disable_android_api': ['true']
+                    'disable_android_api': ['true'],
+                    'disable_ios_api': ['true'],
+                    'force_json_api': ['true']
                 }
-            }
+            },
+            
+            # 디버그 설정
+            'verbose': False,
+            'quiet': True,
+            'no_warnings': True
         }
+    
+    @staticmethod
+    def get_aggressive_bypass_options(output_path: str, subtitle_langs: list = None) -> dict:
+        """최강 우회 옵션 - curl_cffi 기본 사용"""
+        # 기본적으로 curl_cffi 옵션을 사용
+        return DownloadOptions.get_curl_cffi_options(output_path, "chrome120", subtitle_langs)
     
     
     
