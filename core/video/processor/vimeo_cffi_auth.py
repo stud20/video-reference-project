@@ -5,6 +5,7 @@ import os
 from typing import Optional, Dict, Any, List
 import curl_cffi.requests as cffi_requests
 from curl_cffi import requests as cffi
+from yt_dlp.networking.impersonate import ImpersonateTarget
 
 
 def get_vimeo_cffi_access_methods() -> List[Dict[str, Any]]:
@@ -12,22 +13,22 @@ def get_vimeo_cffi_access_methods() -> List[Dict[str, Any]]:
     return [
         {
             'name': 'Chrome 110 모방',
-            'impersonate': 'chrome-110:windows-10',
+            'impersonate': ImpersonateTarget('chrome', '110', 'windows', '10'),
             'method': lambda options: add_cffi_chrome_options(options)
         },
         {
             'name': 'Safari 15.5 모방',
-            'impersonate': 'safari-15.5:macos-12', 
+            'impersonate': ImpersonateTarget('safari', '15.5', 'macos', '12'),
             'method': lambda options: add_cffi_safari_options(options)
         },
         {
             'name': 'Edge 101 모방',
-            'impersonate': 'edge-101:windows-10',
+            'impersonate': ImpersonateTarget('edge', '101', 'windows', '10'),
             'method': lambda options: add_cffi_edge_options(options)
         },
         {
             'name': 'Chrome 99 모방 (Fallback)',
-            'impersonate': 'chrome-99:windows-10',
+            'impersonate': ImpersonateTarget('chrome', '99', 'windows', '10'),
             'method': lambda options: add_cffi_chrome_fallback_options(options)
         }
     ]
@@ -37,7 +38,7 @@ def add_cffi_chrome_options(options: dict) -> dict:
     """Chrome 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'chrome-110:windows-10',
+        'impersonate': ImpersonateTarget('chrome', '110', 'windows', '10'),
         
         # Chrome 특화 헤더
         'http_headers': {
@@ -81,7 +82,7 @@ def add_cffi_safari_options(options: dict) -> dict:
     """Safari 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'safari-15.5:macos-12',
+        'impersonate': ImpersonateTarget('safari', '15.5', 'macos', '12'),
         
         # Safari 특화 헤더
         'http_headers': {
@@ -116,7 +117,7 @@ def add_cffi_edge_options(options: dict) -> dict:
     """Edge 브라우저 모방 curl_cffi 옵션"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'edge-101:windows-10',
+        'impersonate': ImpersonateTarget('edge', '101', 'windows', '10'),
         
         # Edge 특화 헤더
         'http_headers': {
@@ -157,7 +158,7 @@ def add_cffi_chrome_fallback_options(options: dict) -> dict:
     """Chrome 110 폴백 옵션 (더 안정적인 버전)"""
     options.update({
         'http_client': 'curl_cffi',
-        'impersonate': 'chrome-99:windows-10',
+        'impersonate': ImpersonateTarget('chrome', '99', 'windows', '10'),
         
         # 더 기본적인 헤더
         'http_headers': {
@@ -259,8 +260,29 @@ def get_cffi_error_message(status_code: int, error_details: Dict[str, Any] = Non
     return message
 
 
-def add_vimeo_cffi_authentication(options: dict, impersonate: str = "chrome-110:windows-10") -> dict:
+def add_vimeo_cffi_authentication(options: dict, impersonate = None) -> dict:
     """Vimeo용 curl_cffi 인증 옵션 추가 (통합 함수)"""
+    
+    # 기본 impersonate 설정 (ImpersonateTarget 객체)
+    if impersonate is None:
+        impersonate = ImpersonateTarget('chrome', '110', 'windows', '10')
+    elif isinstance(impersonate, str):
+        # 문자열인 경우 ImpersonateTarget으로 변환
+        if ":" in impersonate:
+            browser_part, os_part = impersonate.split(":", 1)
+            if "-" in browser_part:
+                client, version = browser_part.split("-", 1)
+            else:
+                client, version = browser_part, "110"
+            
+            if "-" in os_part:
+                os_name, os_version = os_part.split("-", 1)
+            else:
+                os_name, os_version = os_part, "10"
+                
+            impersonate = ImpersonateTarget(client, version, os_name, os_version)
+        else:
+            impersonate = ImpersonateTarget(impersonate, "110", "windows", "10")
     
     # 기본 curl_cffi 설정
     options['http_client'] = 'curl_cffi'
@@ -278,11 +300,12 @@ def add_vimeo_cffi_authentication(options: dict, impersonate: str = "chrome-110:
     }
     
     # 브라우저별 세부 설정 적용
-    if impersonate.startswith('chrome'):
+    client_name = impersonate.client if hasattr(impersonate, 'client') else 'chrome'
+    if client_name == 'chrome':
         options = add_cffi_chrome_options(options)
-    elif impersonate.startswith('safari'):
+    elif client_name == 'safari':
         options = add_cffi_safari_options(options)
-    elif impersonate.startswith('edge'):
+    elif client_name == 'edge':
         options = add_cffi_edge_options(options)
     else:
         # 기본값으로 Chrome 사용

@@ -2,6 +2,7 @@
 """yt-dlp 다운로드 옵션 설정 - macOS 재생 호환성 중심"""
 
 import os
+from yt_dlp.networking.impersonate import ImpersonateTarget
 
 
 
@@ -14,6 +15,30 @@ class DownloadOptions:
     @staticmethod
     def get_curl_cffi_options(output_path: str, impersonate: str = "chrome-110:windows-10", subtitle_langs: list = None) -> dict:
         """curl_cffi를 사용한 브라우저 모방 옵션 - Cloudflare 우회 특화"""
+        
+        # impersonate 문자열을 ImpersonateTarget 객체로 변환
+        if isinstance(impersonate, str):
+            if ":" in impersonate:
+                # "chrome-110:windows-10" 형식 파싱
+                browser_part, os_part = impersonate.split(":", 1)
+                if "-" in browser_part:
+                    client, version = browser_part.split("-", 1)
+                else:
+                    client, version = browser_part, "110"
+                
+                if "-" in os_part:
+                    os_name, os_version = os_part.split("-", 1) 
+                else:
+                    os_name, os_version = os_part, "10"
+                    
+                impersonate_target = ImpersonateTarget(client, version, os_name, os_version)
+            else:
+                # 단순 브라우저명인 경우 기본값 사용
+                impersonate_target = ImpersonateTarget(impersonate, "110", "windows", "10")
+        else:
+            # 이미 ImpersonateTarget 객체인 경우
+            impersonate_target = impersonate
+        
         return {
             'outtmpl': output_path,
             
@@ -27,7 +52,7 @@ class DownloadOptions:
             
             # curl_cffi 사용 설정 - 핵심!
             'http_client': 'curl_cffi',
-            'impersonate': impersonate,  # chrome120, safari17_0, edge101 등
+            'impersonate': impersonate_target,  # ImpersonateTarget 객체 사용
             
             # 브라우저 모방 헤더 (curl_cffi가 자동으로 설정하지만 추가 보강)
             'http_headers': {
