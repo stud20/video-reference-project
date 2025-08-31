@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  sense-of-frame-dev:
+    image: sense-of-frame:latest
+    container_name: sense-of-frame-dev
+    ports:
+      - "8501:8501"
+    environment:
+      # 경로 설정 - 컨테이너 내부 경로
+      - DATA_DIR=/app/data
+      - TEMP_DIR=/app/data/temp
+      - CACHE_DIR=/app/data/cache
+      - RESULTS_DIR=/app/data/results
+      - REPORTS_DIR=/app/data/results/reports
+      - DATABASE_DIR=/app/data/database
+      - WORKSPACES_DIR=/app/data/workspaces
+    volumes:
+      # Windows 경로 매핑 예시
+      # 왼쪽: 호스트(Windows) 경로, 오른쪽: 컨테이너 내부 경로
+      - C:\Users\ysk\Documents\SOF-video:/app/data
+      
+      # 또는 개별 폴더별로 매핑
+      # - C:\Users\ysk\Documents\SOF-video\temp:/app/data/temp
+      # - C:\Users\ysk\Documents\SOF-video\workspaces:/app/data/workspaces
+      # - C:\Users\ysk\Documents\SOF-video\database:/app/data/database
+      
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

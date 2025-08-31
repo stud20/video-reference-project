@@ -9,6 +9,7 @@ from core.video.models import Video, VideoMetadata
 from utils.logger import get_logger
 from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
+from config.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -19,7 +20,7 @@ class VimeoDownloader(VideoFetcher):
     def __init__(self):
         super().__init__()
         self.logger = logger
-        self.temp_dir = "data/temp"
+        self.temp_dir = Settings.paths.temp_dir
         os.makedirs(self.temp_dir, exist_ok=True)
         self.video_processor = VideoProcessor()
         self.download_options = DownloadOptions()
@@ -82,6 +83,23 @@ class VimeoDownloader(VideoFetcher):
                 ydl_opts = self.download_options.get_balanced_mp4_options(output_template)
             else:  # best
                 ydl_opts = self.download_options.get_best_mp4_options(output_template)
+            
+            # Vimeo 전용 옵션 추가 - OAuth 문제 해결
+            ydl_opts.update({
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive',
+                },
+                'referer': 'https://vimeo.com/',
+                'extractor_args': {
+                    'vimeo': {
+                        'disable_android_api': ['true']  # Android API 비활성화
+                    }
+                }
+            })
             
             self.logger.info(f"📥 다운로드 시작: {video.url} (품질: {quality_option})")
             self.logger.info(f"📁 저장 위치: {output_dir}")

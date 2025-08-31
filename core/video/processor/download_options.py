@@ -42,6 +42,13 @@ class DownloadOptions:
             # 기본 설정만
             'no_warnings': False,
             'ignoreerrors': False,
+            
+            # Vimeo OAuth 문제 해결
+            'extractor_args': {
+                'vimeo': {
+                    'disable_android_api': ['true']
+                }
+            }
         }
     
     @staticmethod

@@ -8,6 +8,7 @@ from core.video.models import Video, VideoMetadata
 from utils.logger import get_logger
 from core.video.processor.download_options import DownloadOptions
 from core.video.processor.video_processor import VideoProcessor
+from core.video.processor.vimeo_patch import add_vimeo_fix
 from config.settings import Settings
 
 logger = get_logger(__name__)
@@ -144,6 +145,11 @@ class YouTubeDownloader(VideoFetcher):
                 self.logger.info(f"🔄 {method_name} 방식으로 시도 중...")
                 ydl_opts = get_options()
                 
+                # Vimeo URL인 경우 OAuth 패치 적용
+                if 'vimeo.com' in url:
+                    ydl_opts = add_vimeo_fix(ydl_opts)
+                    self.logger.info("🔧 Vimeo OAuth 패치 적용")
+                
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     downloaded_file = ydl.prepare_filename(info)
@@ -188,7 +194,12 @@ class YouTubeDownloader(VideoFetcher):
             # 1. 먼저 정보만 추출
             self.logger.info(f"📊 메타데이터 추출 중: {url}")
             # progress_callback 제거 (너무 자주 호출됨)
-            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+            # Vimeo의 경우 OAuth 패치 적용
+            extract_opts = {'quiet': True, 'no_warnings': True}
+            if 'vimeo.com' in url:
+                extract_opts = add_vimeo_fix(extract_opts)
+            
+            with yt_dlp.YoutubeDL(extract_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 video_id = info.get('id', '')
                 video_title = info.get('title', 'untitled')
@@ -306,7 +317,12 @@ class YouTubeDownloader(VideoFetcher):
         """
         # URL에서 video_id 추출
         normalized_url = self._normalize_url(url)
-        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+        # Vimeo의 경우 OAuth 패치 적용
+        extract_opts = {'quiet': True, 'no_warnings': True}
+        if 'vimeo.com' in normalized_url:
+            extract_opts = add_vimeo_fix(extract_opts)
+        
+        with yt_dlp.YoutubeDL(extract_opts) as ydl:
             info = ydl.extract_info(normalized_url, download=False)
             video_id = info.get('id', 'temp')
         
