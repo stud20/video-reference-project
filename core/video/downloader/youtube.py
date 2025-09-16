@@ -111,10 +111,13 @@ class YouTubeDownloader(VideoFetcher):
 
 
     def _download_with_fallback(self, url: str, output_template: str, quality_option: str) -> Tuple[str, Dict[str, Any]]:
-        """순차적 다운로드 시도: 쿠키 없는 방법들만 사용"""
-        
-        # 다운로드 방법들 정의 (쿠키 없는 방법들만)
+        """순차적 다운로드 시도: curl_cffi 기반 브라우저 모방 우선"""
+
+        # 다운로드 방법들 정의 (curl_cffi 우선)
         download_methods = [
+            ("Chrome 브라우저 모방", lambda: self.download_options.get_curl_cffi_options(output_template, "chrome-110:windows-10")),
+            ("Firefox 브라우저 모방", lambda: self.download_options.get_curl_cffi_options(output_template, "firefox-120:windows-10")),
+            ("Safari 브라우저 모방", lambda: self.download_options.get_curl_cffi_options(output_template, "safari-16:macos-13")),
             ("쿠키 없이", lambda: self.download_options.get_no_cookies_mp4_options(output_template)),
             ("최강 우회 모드", lambda: self.download_options.get_aggressive_bypass_options(output_template))
         ]
@@ -363,15 +366,30 @@ class YouTubeDownloader(VideoFetcher):
                     height = info.get('height', 0)
                 
             else:
-                # YouTube 등 다른 플랫폼
-                extract_opts = {'quiet': True, 'no_warnings': True}
-                with yt_dlp.YoutubeDL(extract_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    video_id = info.get('id', '')
-                    video_title = info.get('title', 'untitled')
-                    duration = info.get('duration', 0)
-                    width = info.get('width', 0)
-                    height = info.get('height', 0)
+                # YouTube 등 다른 플랫폼 - curl_cffi 사용
+                try:
+                    # Chrome 브라우저 모방으로 메타데이터 추출
+                    extract_opts = self.download_options.get_curl_cffi_options("/tmp/dummy", "chrome-110:windows-10")
+                    extract_opts['quiet'] = True
+                    extract_opts['no_warnings'] = True
+                    with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        video_id = info.get('id', '')
+                        video_title = info.get('title', 'untitled')
+                        duration = info.get('duration', 0)
+                        width = info.get('width', 0)
+                        height = info.get('height', 0)
+                except Exception as e:
+                    self.logger.warning(f"curl_cffi 메타데이터 추출 실패, 기본 방식 시도: {str(e)}")
+                    # 기본 방식으로 재시도
+                    extract_opts = {'quiet': True, 'no_warnings': True}
+                    with yt_dlp.YoutubeDL(extract_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                        video_id = info.get('id', '')
+                        video_title = info.get('title', 'untitled')
+                        duration = info.get('duration', 0)
+                        width = info.get('width', 0)
+                        height = info.get('height', 0)
             
             # Shorts 감지 (URL 패턴으로만)
             is_shorts = '/shorts/' in url

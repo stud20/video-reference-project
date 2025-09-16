@@ -29,15 +29,23 @@ class DownloadOptions:
                 # "chrome-110:windows-10" 형식 파싱
                 browser_part, os_part = impersonate.split(":", 1)
                 if "-" in browser_part:
-                    client, version = browser_part.split("-", 1)
+                    client, version = browser_part.rsplit("-", 1)  # rsplit 사용 (safari-16 같은 경우 대응)
                 else:
                     client, version = browser_part, "110"
-                
-                if "-" in os_part:
-                    os_name, os_version = os_part.split("-", 1) 
+
+                # OS 파싱 수정
+                if "macos" in os_part:
+                    os_name = "macos"
+                    os_version = os_part.replace("macos-", "")
+                elif "windows" in os_part:
+                    os_name = "windows"
+                    os_version = os_part.replace("windows-", "")
                 else:
-                    os_name, os_version = os_part, "10"
-                    
+                    if "-" in os_part:
+                        os_name, os_version = os_part.split("-", 1)
+                    else:
+                        os_name, os_version = os_part, "10"
+
                 impersonate_target = ImpersonateTarget(client, version, os_name, os_version)
             else:
                 # 단순 브라우저명인 경우 기본값 사용
