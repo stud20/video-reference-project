@@ -162,6 +162,12 @@ class NotionPageService:
             logger.warning("⚠️ 비디오 URL이 없습니다.")
             return None
         
+        # URL 검증 및 정리
+        # 직접 파일 URL(.mp4 등)인 경우 스킵
+        if embed_url.endswith(('.mp4', '.webm', '.avi', '.mov')):
+            logger.warning(f"⚠️ 직접 파일 URL은 Notion에서 지원하지 않음: {embed_url}")
+            return None
+            
         # Vimeo 또는 YouTube URL인 경우에만 임베드
         if any(domain in embed_url for domain in ['vimeo.com', 'youtube.com', 'youtu.be']):
             logger.info(f"✅ 비디오 임베드 생성: {embed_url}")
@@ -253,10 +259,12 @@ class NotionPageService:
         expression = self.safe_get(analysis_data, 'expression_style', '실사')
         blocks.append(self._create_bulleted_list_item(expression))
         
-        # YouTube URL
+        # 원본 페이지 URL (YouTube/Vimeo)
+        webpage_url = self.safe_get(video_data, 'webpage_url', '')
         url = self.safe_get(video_data, 'url', '')
-        if url:
-            blocks.append(self._create_bulleted_list_item(url, link=url))
+        display_url = webpage_url if webpage_url else url
+        if display_url and not display_url.endswith(('.mp4', '.webm', '.avi', '.mov')):
+            blocks.append(self._create_bulleted_list_item(display_url, link=display_url))
         
         # 공백 추가 (선택사항)
         blocks.append(self._create_paragraph(""))
