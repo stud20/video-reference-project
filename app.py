@@ -363,6 +363,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.13.0</strong> (2025-09-24) - 추론 결과 페이지에 Notion 업로드 버튼 추가 (upsert 기능)</p>
                         <p><strong>v2.12.0</strong> (2025-09-23) - Notion 데이터베이스 전체 동기화 기능 추가 (누락/중복 체크)</p>
                         <p><strong>v2.11.2</strong> (2025-09-16) - YouTube 다운로드에 curl_cffi 브라우저 모방 적용 (403 에러 해결)</p>
                         <p><strong>v2.11.1</strong> (2025-08-31) - yt-dlp curl_cffi impersonate 형식 수정으로 AssertionError 해결</p>
@@ -408,6 +409,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.13.0</strong> (2025-09-24) - 추론 결과 페이지에 Notion 업로드 버튼 추가 (upsert 기능)</p>
                         <p><strong>v2.12.0</strong> (2025-09-23) - Notion 데이터베이스 전체 동기화 기능 추가 (누락/중복 체크)</p>
                         <p><strong>v2.11.2</strong> (2025-09-16) - YouTube 다운로드에 curl_cffi 브라우저 모방 적용 (403 에러 해결)</p>
                         <p><strong>v2.11.1</strong> (2025-08-31) - yt-dlp curl_cffi impersonate 형식 수정으로 AssertionError 해결</p>
