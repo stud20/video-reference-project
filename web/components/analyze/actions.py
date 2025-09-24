@@ -22,46 +22,48 @@ def render_action_buttons(video):
     """액션 버튼들"""
     # 통합 스타일 적용
     st.markdown(get_enhanced_styles(), unsafe_allow_html=True)
-    
+
     # video 객체 확인 - 더 유연하게 처리
     if not video:
         st.error("분석 결과가 없습니다.")
         return
-        
+
     # Video 객체의 필수 속성 확인
     has_session_id = hasattr(video, 'session_id')
     has_metadata = hasattr(video, 'metadata')
     has_url = hasattr(video, 'url')
-    
+    has_analysis = hasattr(video, 'analysis_result')
+
     if not (has_session_id and has_url):
         st.error("비디오 정보가 올바르지 않습니다.")
         logger.error(f"Invalid video object - Type: {type(video)}, Attributes: {dir(video)}")
         return
-    
+
     base_url = "https://ref.greatminds.kr"
     video_id = video.session_id
-    
+
     # 파일명 정리
     def sanitize_filename(title: str, max_length: int = 100) -> str:
         safe_title = re.sub(r'[<>:"/\\|?*]', '_', title)
         safe_title = re.sub(r'_+', '_', safe_title)
         safe_title = safe_title.strip('_ ')
         return safe_title[:max_length]
-    
+
     # 메타데이터가 있으면 제목 사용, 없으면 기본값
     if has_metadata and video.metadata and hasattr(video.metadata, 'title'):
         video_title = video.metadata.title
     else:
         video_title = "video"
-        
+
     sanitized_title = sanitize_filename(video_title)
     video_filename = f"{video_id}_{sanitized_title}.mp4"
-    
+
     encoded_filename = urllib.parse.quote(video_filename)
     video_url = f"{base_url}/{video_id}/{encoded_filename}"
     download_filename = f"{sanitized_title}_{video_id}.mp4"
-    
-    col1, col2, col3 = st.columns(3)
+
+    # 4개 버튼으로 변경
+    col1, col2, col3, col4 = st.columns(4)
     
 
     with col1:
@@ -128,6 +130,20 @@ def render_action_buttons(video):
             st.rerun()
     
     with col3:
+        # Notion 업로드 버튼
+        notion_button_text = "📝 Notion으로 보내기"
+        if st.session_state.get('notion_upload_status') == 'uploading':
+            notion_button_text = "⏳ 업로드 중..."
+
+        if st.button(
+            notion_button_text,
+            use_container_width=True,
+            key="upload_to_notion",
+            disabled=st.session_state.get('notion_upload_status') == 'uploading'
+        ):
+            upload_to_notion(video)
+
+    with col4:
         if st.button("🔄 재추론하기", use_container_width=True, key="reanalyze"):
             st.session_state.show_reanalysis = not st.session_state.get('show_reanalysis', False)
             # 무드보드가 열려있으면 닫기
@@ -329,6 +345,84 @@ def get_all_scene_numbers(video) -> set:
             all_nums = set(range(0, max_num + 1))
     
     return all_nums
+
+
+def upload_to_notion(video):
+    """노션으로 분석 결과 업로드 (Upsert 방식)"""
+    try:
+        # 상태 초기화
+        st.session_state.notion_upload_status = 'uploading'
+
+        # Notion 서비스 초기화
+        from integrations.notion.client import NotionService
+
+        notion_service = NotionService()
+
+        # 비디오 메타데이터 준비
+        video_data = {}
+        if hasattr(video, 'metadata') and video.metadata:
+            metadata = video.metadata
+            video_data = {
+                'video_id': metadata.video_id if hasattr(metadata, 'video_id') else video.session_id,
+                'title': metadata.title if hasattr(metadata, 'title') else 'Unknown',
+                'url': metadata.url if hasattr(metadata, 'url') else video.url,
+                'webpage_url': metadata.webpage_url if hasattr(metadata, 'webpage_url') else video.url,
+                'thumbnail': metadata.thumbnail if hasattr(metadata, 'thumbnail') else None,
+                'platform': metadata.platform if hasattr(metadata, 'platform') else 'unknown',
+                'duration': metadata.duration if hasattr(metadata, 'duration') else 0,
+                'uploader': metadata.uploader if hasattr(metadata, 'uploader') else 'Unknown',
+                'channel': metadata.uploader if hasattr(metadata, 'uploader') else 'Unknown',
+                'channel_id': metadata.channel_id if hasattr(metadata, 'channel_id') else None,
+                'upload_date': metadata.upload_date if hasattr(metadata, 'upload_date') else None,
+                'description': metadata.description if hasattr(metadata, 'description') else None,
+                'view_count': metadata.view_count if hasattr(metadata, 'view_count') else 0,
+                'like_count': metadata.like_count if hasattr(metadata, 'like_count') else 0,
+                'comment_count': metadata.comment_count if hasattr(metadata, 'comment_count') else 0,
+                'tags': metadata.tags if hasattr(metadata, 'tags') else [],
+                'categories': metadata.categories if hasattr(metadata, 'categories') else [],
+                'language': metadata.language if hasattr(metadata, 'language') else None,
+                'age_limit': metadata.age_limit if hasattr(metadata, 'age_limit') else 0,
+            }
+        else:
+            # 메타데이터가 없는 경우 최소한의 정보만
+            video_data = {
+                'video_id': video.session_id,
+                'title': 'Unknown',
+                'url': video.url,
+                'webpage_url': video.url,
+            }
+
+        # 분석 데이터
+        analysis_data = video.analysis_result if hasattr(video, 'analysis_result') else {}
+
+        # Notion에 업로드 (upsert)
+        success, result = notion_service.add_video_to_database(
+            video_data=video_data,
+            analysis_data=analysis_data
+        )
+
+        # 상태 초기화
+        st.session_state.notion_upload_status = 'done'
+
+        if success:
+            st.success("✅ Notion에 성공적으로 업로드되었습니다!")
+            logger.info(f"Notion 업로드 성공: {result}")
+        else:
+            st.error(f"❌ Notion 업로드 실패: {result}")
+            logger.error(f"Notion 업로드 실패: {result}")
+
+    except ImportError as e:
+        st.error("Notion 설정이 되어있지 않습니다. 설정에서 Notion API를 구성해주세요.")
+        logger.error(f"Notion 서비스 초기화 실패: {str(e)}")
+        st.session_state.notion_upload_status = 'error'
+    except Exception as e:
+        st.error(f"Notion 업로드 중 오류 발생: {str(e)}")
+        logger.error(f"Notion 업로드 오류: {str(e)}")
+        st.session_state.notion_upload_status = 'error'
+    finally:
+        # 잠시 후 상태 리셋
+        if st.session_state.get('notion_upload_status') == 'done':
+            st.session_state.notion_upload_status = None
 
 
 @st.dialog("🎚️ 정밀도 선택", width="medium")
