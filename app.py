@@ -363,6 +363,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.13.2</strong> (2025-10-02) - Vimeo 영상 Notion 동기화 개선 (플랫폼 매핑 로직 개선)</p>
                         <p><strong>v2.13.1</strong> (2025-10-02) - Notion 동기화 안정성 개선 (빈 ID 필터링, null 처리, 에러 핸들링)</p>
                         <p><strong>v2.13.0</strong> (2025-09-24) - 추론 결과 페이지에 Notion 업로드 버튼 추가 (upsert 기능)</p>
                         <p><strong>v2.12.0</strong> (2025-09-23) - Notion 데이터베이스 전체 동기화 기능 추가 (누락/중복 체크)</p>
@@ -410,6 +411,7 @@ def main():
                 <details style="margin-top: 10px;">
                     <summary style="cursor: pointer; font-weight: bold;">📋 Version History</summary>
                     <div style="padding: 10px 0; font-size: 0.85em; line-height: 1.6;">
+                        <p><strong>v2.13.2</strong> (2025-10-02) - Vimeo 영상 Notion 동기화 개선 (플랫폼 매핑 로직 개선)</p>
                         <p><strong>v2.13.1</strong> (2025-10-02) - Notion 동기화 안정성 개선 (빈 ID 필터링, null 처리, 에러 핸들링)</p>
                         <p><strong>v2.13.0</strong> (2025-09-24) - 추론 결과 페이지에 Notion 업로드 버튼 추가 (upsert 기능)</p>
                         <p><strong>v2.12.0</strong> (2025-09-23) - Notion 데이터베이스 전체 동기화 기능 추가 (누락/중복 체크)</p>
