@@ -270,55 +270,71 @@ def render_notion_sync_modal():
         elif st.session_state.sync_in_progress:
             # 동기화 진행 중
             with st.spinner("Notion과 동기화 중..."):
-                sync_service = NotionSyncService()
+                try:
+                    sync_service = NotionSyncService()
 
-                # 1단계: 분석
-                with st.status("동기화 분석 중...", expanded=True) as status:
-                    missing_items, duplicate_ids, stats = sync_service.find_missing_items()
+                    # 1단계: 분석
+                    with st.status("동기화 분석 중...", expanded=True) as status:
+                        missing_items, duplicate_ids, stats = sync_service.find_missing_items()
 
-                    st.write(f"📊 로컬 DB 항목: {stats.get('total_local', 0)}개")
-                    st.write(f"📊 Notion 항목: {stats.get('total_notion', 0)}개")
-                    st.write(f"🔍 누락 항목: {stats.get('missing_count', 0)}개")
-                    st.write(f"⚠️ 중복 항목: {stats.get('duplicate_count', 0)}개")
+                        st.write(f"📊 로컬 DB 항목: {stats.get('total_local', 0)}개")
+                        st.write(f"📊 Notion 항목: {stats.get('total_notion', 0)}개")
+                        st.write(f"🔍 누락 항목: {stats.get('missing_count', 0)}개")
+                        st.write(f"⚠️ 중복 항목: {stats.get('duplicate_count', 0)}개")
 
-                    if duplicate_ids:
-                        st.warning(f"중복된 비디오 ID: {', '.join(duplicate_ids[:5])}")
+                        if duplicate_ids:
+                            st.warning(f"중복된 비디오 ID: {', '.join(duplicate_ids[:5])}")
+                            if len(duplicate_ids) > 5:
+                                st.warning(f"... 외 {len(duplicate_ids) - 5}개 중복")
 
-                    status.update(label="분석 완료!", state="complete")
+                        status.update(label="분석 완료!", state="complete")
+                except Exception as e:
+                    logger.error(f"동기화 분석 중 오류: {str(e)}")
+                    st.error(f"❌ 동기화 분석 실패: {str(e)}")
+                    st.session_state.sync_in_progress = False
+                    st.session_state.sync_completed = False
+                    st.rerun()
 
                 # 2단계: 동기화
-                if missing_items:
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
+                try:
+                    if missing_items:
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
 
-                    def update_progress(current, total, title):
-                        progress = current / total if total > 0 else 0
-                        progress_bar.progress(progress)
-                        status_text.text(f"처리 중 ({current}/{total}): {title[:50]}...")
+                        def update_progress(current, total, title):
+                            progress = current / total if total > 0 else 0
+                            progress_bar.progress(progress)
+                            status_text.text(f"처리 중 ({current}/{total}): {title[:50]}...")
 
-                    success_count, fail_count, errors = sync_service.sync_missing_items(
-                        missing_items,
-                        progress_callback=update_progress
-                    )
+                        success_count, fail_count, errors = sync_service.sync_missing_items(
+                            missing_items,
+                            progress_callback=update_progress
+                        )
 
-                    # 결과 저장
-                    st.session_state.sync_result = {
-                        'success_count': success_count,
-                        'fail_count': fail_count,
-                        'errors': errors,
-                        'stats': stats
-                    }
-                else:
-                    st.session_state.sync_result = {
-                        'success_count': 0,
-                        'fail_count': 0,
-                        'errors': [],
-                        'stats': stats
-                    }
+                        # 결과 저장
+                        st.session_state.sync_result = {
+                            'success_count': success_count,
+                            'fail_count': fail_count,
+                            'errors': errors,
+                            'stats': stats
+                        }
+                    else:
+                        st.session_state.sync_result = {
+                            'success_count': 0,
+                            'fail_count': 0,
+                            'errors': [],
+                            'stats': stats
+                        }
 
-                st.session_state.sync_in_progress = False
-                st.session_state.sync_completed = True
-                st.rerun()
+                    st.session_state.sync_in_progress = False
+                    st.session_state.sync_completed = True
+                    st.rerun()
+                except Exception as e:
+                    logger.error(f"동기화 실행 중 오류: {str(e)}")
+                    st.error(f"❌ 동기화 실행 실패: {str(e)}")
+                    st.session_state.sync_in_progress = False
+                    st.session_state.sync_completed = False
+                    st.rerun()
 
         elif st.session_state.sync_completed:
             # 동기화 완료

@@ -63,7 +63,7 @@ class NotionSyncService:
             page: Notion 페이지 객체
 
         Returns:
-            비디오 ID 또는 None
+            비디오 ID 또는 None (빈 문자열은 None으로 변환)
         """
         try:
             properties = page.get('properties', {})
@@ -71,7 +71,9 @@ class NotionSyncService:
 
             if video_id_prop.get('rich_text'):
                 if len(video_id_prop['rich_text']) > 0:
-                    return video_id_prop['rich_text'][0].get('text', {}).get('content', '')
+                    video_id = video_id_prop['rich_text'][0].get('text', {}).get('content', '')
+                    # 빈 문자열은 None으로 반환
+                    return video_id.strip() if video_id and video_id.strip() else None
 
             return None
 
@@ -102,6 +104,7 @@ class NotionSyncService:
 
             for item in notion_items:
                 video_id = self.extract_video_id_from_notion(item)
+                # extract 메서드가 이미 None이나 빈 문자열을 필터링함
                 if video_id:
                     notion_video_ids.append(video_id)
                     video_id_counts[video_id] = video_id_counts.get(video_id, 0) + 1
@@ -112,7 +115,8 @@ class NotionSyncService:
             # 누락된 항목 찾기
             missing_items = []
             for video in local_videos:
-                video_id = video.get('video_id')
+                video_id = video.get('video_id', '').strip()
+                # video_id가 존재하고, Notion에 없는 경우
                 if video_id and video_id not in notion_video_ids:
                     missing_items.append(video)
 
@@ -157,10 +161,15 @@ class NotionSyncService:
                 if progress_callback:
                     progress_callback(i + 1, len(missing_items), video.get('title', 'Unknown'))
 
+                # 분석 데이터 확인 (None인 경우 빈 딕셔너리 전달)
+                analysis_data = video.get('analysis_result')
+                if analysis_data is None:
+                    analysis_data = {}
+
                 # Notion에 업로드
                 success, message = self.notion_service.add_video_to_database(
                     video_data=video,
-                    analysis_data=video.get('analysis_result')
+                    analysis_data=analysis_data
                 )
 
                 if success:
