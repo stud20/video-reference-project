@@ -52,8 +52,10 @@ class NotionSyncService:
             return all_items
 
         except Exception as e:
-            logger.error(f"Notion 항목 조회 중 오류: {str(e)}")
-            return []
+            logger.error(f"❌ Notion 항목 조회 중 오류: {str(e)}")
+            import traceback
+            logger.error(f"상세 오류: {traceback.format_exc()}")
+            return None  # 오류 발생 시 None 반환하여 호출자가 인지할 수 있도록
 
     def extract_video_id_from_notion(self, page: Dict[str, Any]) -> Optional[str]:
         """
@@ -94,9 +96,17 @@ class NotionSyncService:
         try:
             # 로컬 DB의 모든 비디오 가져오기
             local_videos = self.local_db.get_all_videos()
+            logger.info(f"로컬 DB에서 {len(local_videos)}개 비디오 조회")
 
             # Notion의 모든 항목 가져오기
             notion_items = self.get_all_notion_items()
+
+            # Notion API 오류 체크
+            if notion_items is None:
+                logger.error("⚠️ Notion API 호출 실패 - 동기화 중단")
+                raise Exception("Notion API 호출 실패. API 키와 데이터베이스 ID를 확인하세요.")
+
+            logger.info(f"Notion에서 {len(notion_items)}개 항목 조회")
 
             # Notion에 있는 비디오 ID 추출
             notion_video_ids = []
