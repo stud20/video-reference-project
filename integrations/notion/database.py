@@ -47,10 +47,38 @@ class NotionDatabaseService(NotionBaseService):
         except Exception as e:
             logger.error(f"스키마 확인 중 오류: {str(e)}")
     
+    def _get_platform_property(self, video_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        플랫폼 프로퍼티 생성
+
+        Args:
+            video_data: 비디오 데이터
+
+        Returns:
+            Notion select 프로퍼티
+        """
+        platform = self.safe_get(video_data, 'platform', '').lower().strip()
+
+        # 플랫폼 매핑
+        platform_map = {
+            'youtube': 'YouTube',
+            'vimeo': 'Vimeo'
+        }
+
+        platform_name = platform_map.get(platform, 'Unknown')
+
+        logger.debug(f"플랫폼 매핑: '{platform}' -> '{platform_name}'")
+
+        return {
+            "select": {
+                "name": platform_name
+            }
+        }
+
     def get_youtube_thumbnail_url(self, video_id: str, quality: str = 'hqdefault') -> str:
         """
         YouTube 썸네일 URL 생성
-        
+
         Args:
             video_id: YouTube 비디오 ID
             quality: 썸네일 품질
@@ -59,7 +87,7 @@ class NotionDatabaseService(NotionBaseService):
                 - hqdefault: 480x360 (권장)
                 - mqdefault: 320x180
                 - default: 120x90
-        
+
         Returns:
             썸네일 URL
         """
@@ -85,11 +113,7 @@ class NotionDatabaseService(NotionBaseService):
             "URL": {
                 "url": self.safe_get(video_data, 'url', '')
             },
-            "플랫폼": {
-                "select": {
-                    "name": "YouTube" if self.safe_get(video_data, 'platform', '').lower() == 'youtube' else "Vimeo"
-                }
-            },
+            "플랫폼": self._get_platform_property(video_data),
             "업로더": {
                 "rich_text": [{
                     "text": {"content": self.safe_get(video_data, 'uploader', self.safe_get(video_data, 'channel', 'Unknown'))[:100]}

@@ -62,7 +62,8 @@ class NotionBaseService:
                 "select": {
                     "options": [
                         {"name": "YouTube", "color": "red"},
-                        {"name": "Vimeo", "color": "blue"}
+                        {"name": "Vimeo", "color": "blue"},
+                        {"name": "Unknown", "color": "gray"}
                     ]
                 }
             },

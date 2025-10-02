@@ -166,6 +166,11 @@ class NotionSyncService:
                 if analysis_data is None:
                     analysis_data = {}
 
+                # 디버그 로그
+                video_id = video.get('video_id', 'Unknown')
+                platform = video.get('platform', 'Unknown')
+                logger.info(f"🔄 동기화 시도: [{platform}] {video.get('title', 'Unknown')[:50]} (ID: {video_id})")
+
                 # Notion에 업로드
                 success, message = self.notion_service.add_video_to_database(
                     video_data=video,
@@ -174,10 +179,10 @@ class NotionSyncService:
 
                 if success:
                     success_count += 1
-                    logger.info(f"✅ Notion 동기화 성공: {video.get('title', 'Unknown')}")
+                    logger.info(f"✅ Notion 동기화 성공: [{platform}] {video.get('title', 'Unknown')}")
                 else:
                     fail_count += 1
-                    error_msg = f"{video.get('title', 'Unknown')}: {message}"
+                    error_msg = f"[{platform}] {video.get('title', 'Unknown')}: {message}"
                     errors.append(error_msg)
                     logger.error(f"❌ Notion 동기화 실패: {error_msg}")
 
